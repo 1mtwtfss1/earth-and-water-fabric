@@ -1,7 +1,4 @@
-# BEFORE YOU ASK
-Backports for E&W will be rolling out within the first few weeks of release, be patient. I wish to patch any bugs that may exist before releasing 20 more buggy versions. E&W will support **1.20+**
-# 
-Earth & Water is a mod that expands on elemental mobs. Minecraft has the Blaze and Breeze, which fills in half the elemental mobs. E&W adds the other two elemental mobs, the Bore and Brine! These two mobs come with their own blocks and structures that fit them respectively.
+![Keyart](https://wsrv.nl/?url=https%3A%2F%2Fearth-and-water.github.io%2Fassets%2Fwiki%2Ftemp_keyart.png&n=-1)
 
 # ![Bore Idle Animation](https://cdn.modrinth.com/data/cached_images/35ff6484a7b59ad6509ed7a8193b392c57cc4d8d.gif) Bore
 Think Blaze or Breeze.. but Earth. The bore is a protective mob who wants you away from it. Bores spawn in Ancient Ruins. If one catches you spelunking in its territory, it'll shoot out a **Earth Charge** at you. These Earth Charges fracture on impact and hurt, a lot. If you get too close, it'll try burrowing in the ground to get away. You can of course dig it up with a pickaxe if you catch up to it.
