@@ -1,28 +1,37 @@
 package potatowolfie.earth_and_water.entity.brine;
 
-import net.minecraft.entity.*;
-import net.minecraft.entity.ai.control.LookControl;
-import net.minecraft.entity.ai.control.MoveControl;
-import net.minecraft.entity.ai.goal.*;
-import net.minecraft.entity.ai.pathing.EntityNavigation;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.mob.WaterCreatureEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.ServerWorldAccess;
-import net.minecraft.world.World;
-import net.minecraft.registry.tag.FluidTags;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AnimationState;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.control.LookControl;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.ai.goal.RandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.animal.fish.WaterAnimal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
 import potatowolfie.earth_and_water.entity.ModEntities;
 import potatowolfie.earth_and_water.entity.custom.HostileWaterCreatureEntity;
 import potatowolfie.earth_and_water.entity.water_charge.WaterChargeProjectileEntity;
@@ -47,7 +56,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     private static final double PROJECTILE_DANGER_RADIUS = 6.0;
     private static final double FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS = 8.0;
     private int shootCooldown = 0;
-    private Vec3d lastShootPosition = null;
+    private Vec3 lastShootPosition = null;
     private boolean hasMovedEnoughToShoot = true;
 
     private BlockPos homePos = null;
@@ -59,54 +68,54 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         SHOOTING
     }
 
-    private static final TrackedData<Integer> DATA_ID_STATE =
-            DataTracker.registerData(BrineEntity.class, TrackedDataHandlerRegistry.INTEGER);
-    private static final TrackedData<Boolean> MOVING =
-            DataTracker.registerData(BrineEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final EntityDataAccessor<Integer> DATA_ID_STATE =
+            SynchedEntityData.defineId(BrineEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> MOVING =
+            SynchedEntityData.defineId(BrineEntity.class, EntityDataSerializers.BOOLEAN);
 
     private BrineState brineState = BrineState.UNDERWATER_IDLE;
     private BrineState previousState = BrineState.UNDERWATER_IDLE;
     private boolean isChangingState = false;
 
-    public BrineEntity(EntityType<? extends BrineEntity> entityType, World world) {
+    public BrineEntity(EntityType<? extends BrineEntity> entityType, Level world) {
         super(entityType, world);
         this.moveControl = new BrineHybridMoveControl(this);
     }
 
-    public static DefaultAttributeContainer.Builder createBrineAttributes() {
-        return WaterCreatureEntity.createMobAttributes()
-                .add(EntityAttributes.MAX_HEALTH, 30.0D)
-                .add(EntityAttributes.ATTACK_DAMAGE, 6.0D)
-                .add(EntityAttributes.MOVEMENT_SPEED, 0.23000000417232513);
+    public static AttributeSupplier.Builder createBrineAttributes() {
+        return WaterAnimal.createMobAttributes()
+                .add(Attributes.MAX_HEALTH, 30.0D)
+                .add(Attributes.ATTACK_DAMAGE, 6.0D)
+                .add(Attributes.MOVEMENT_SPEED, 0.23000000417232513);
     }
 
     @Override
-    protected void initGoals() {
-        this.goalSelector.add(0, new BrineAvoidProjectileGoal(this));
-        this.goalSelector.add(1, new BrineSeekWaterGoal(this, 1.0D));
-        this.goalSelector.add(2, new BrineHybridSwimGoal(this, 1.25D));
-        this.goalSelector.add(3, new BrineShootGoal(this));
-        this.goalSelector.add(7, new WanderAroundGoal(this, 1.0, 80));
-        this.goalSelector.add(8, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(9, new LookAroundGoal(this));
+    protected void registerGoals() {
+        this.goalSelector.addGoal(0, new BrineAvoidProjectileGoal(this));
+        this.goalSelector.addGoal(1, new BrineSeekWaterGoal(this, 1.0D));
+        this.goalSelector.addGoal(2, new BrineHybridSwimGoal(this, 1.25D));
+        this.goalSelector.addGoal(3, new BrineShootGoal(this));
+        this.goalSelector.addGoal(7, new RandomStrollGoal(this, 1.0, 80));
+        this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
 
-        this.targetSelector.add(1, new ActiveTargetGoal<>(this, PlayerEntity.class, true));
-        this.targetSelector.add(2, new RevengeGoal(this));
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, true));
+        this.targetSelector.addGoal(2, new HurtByTargetGoal(this));
     }
 
     @Override
     protected SoundEvent getDeathSound() {
-        return this.touchingWater ? ModSounds.BRINE_UNDERWATER_DEATH : ModSounds.BRINE_DEATH;
+        return this.wasTouchingWater ? ModSounds.BRINE_UNDERWATER_DEATH : ModSounds.BRINE_DEATH;
     }
 
     @Override
     protected SoundEvent getHurtSound(DamageSource source) {
-        return this.touchingWater ? ModSounds.BRINE_UNDERWATER_DEATH : ModSounds.BRINE_DEATH;
+        return this.wasTouchingWater ? ModSounds.BRINE_UNDERWATER_DEATH : ModSounds.BRINE_DEATH;
     }
 
     @Override
     protected SoundEvent getAmbientSound() {
-        return this.touchingWater ? ModSounds.BRINE_UNDERWATER_AMBIENT : ModSounds.BRINE_AMBIENT;
+        return this.wasTouchingWater ? ModSounds.BRINE_UNDERWATER_AMBIENT : ModSounds.BRINE_AMBIENT;
     }
 
     public void setHomePosition(BlockPos pos) {
@@ -117,29 +126,29 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         if (this.homePos == null) {
             return true;
         }
-        return this.homePos.isWithinDistance(pos, MAX_DISTANCE_FROM_HOME);
+        return this.homePos.closerThan(pos, MAX_DISTANCE_FROM_HOME);
     }
 
-    private boolean isWithinHomeBounds(Vec3d pos) {
+    private boolean isWithinHomeBounds(Vec3 pos) {
         if (this.homePos == null) {
             return true;
         }
-        return this.homePos.isWithinDistance(pos, MAX_DISTANCE_FROM_HOME);
+        return this.homePos.closerToCenterThan(pos, MAX_DISTANCE_FROM_HOME);
     }
 
     @Override
-    protected EntityNavigation createNavigation(World world) {
+    protected PathNavigation createNavigation(Level world) {
         return new BrineNavigation(this, world);
     }
 
     public static boolean canSpawn(
             EntityType<BrineEntity> type,
-            ServerWorldAccess world,
-            SpawnReason spawnReason,
+            ServerLevelAccessor world,
+            EntitySpawnReason spawnReason,
             BlockPos pos,
-            Random random
+            RandomSource random
     ) {
-        return world.getFluidState(pos).isIn(FluidTags.WATER);
+        return world.getFluidState(pos).is(FluidTags.WATER);
     }
 
     public static class BrineSwimInWaterGoal extends Goal {
@@ -155,12 +164,12 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             this.brine = brine;
             this.speed = speed;
             this.chance = chance;
-            this.setControls(EnumSet.of(Goal.Control.MOVE));
+            this.setFlags(EnumSet.of(Goal.Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
-            if (this.brine.hasPassengers() || this.brine.getTarget() != null) {
+        public boolean canUse() {
+            if (this.brine.isVehicle() || this.brine.getTarget() != null) {
                 return false;
             }
 
@@ -168,7 +177,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
                 return false;
             }
 
-            return this.brine.isTouchingWater();
+            return this.brine.isInWater();
         }
 
         @Override
@@ -178,8 +187,8 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
-            return this.brine.isTouchingWater();
+        public boolean canContinueToUse() {
+            return this.brine.isInWater();
         }
 
         @Override
@@ -194,14 +203,14 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             this.ticksSinceLastTarget++;
 
             if (this.ticksSinceLastTarget >= 150 ||
-                    this.brine.squaredDistanceTo(this.targetX, this.targetY, this.targetZ) < 1.0D) {
+                    this.brine.distanceToSqr(this.targetX, this.targetY, this.targetZ) < 1.0D) {
                 this.chooseWaterTarget();
                 this.ticksSinceLastTarget = 0;
             }
         }
 
         private void chooseWaterTarget() {
-            Vec3d currentPos = this.brine.getEntityPos();
+            Vec3 currentPos = this.brine.position();
             int range = 15;
             int minDistance = 7;
 
@@ -229,15 +238,15 @@ public class BrineEntity extends HostileWaterCreatureEntity {
                     continue;
                 }
 
-                if (this.brine.getEntityWorld().getFluidState(checkPos).isIn(FluidTags.WATER)) {
+                if (this.brine.level().getFluidState(checkPos).is(FluidTags.WATER)) {
                     this.targetX = potentialX;
                     this.targetY = potentialY;
                     this.targetZ = potentialZ;
 
                     if (this.brine.isFullySubmerged()) {
-                        this.brine.getMoveControl().moveTo(this.targetX, this.targetY, this.targetZ, this.speed);
+                        this.brine.getMoveControl().setWantedPosition(this.targetX, this.targetY, this.targetZ, this.speed);
                     } else {
-                        this.brine.getNavigation().startMovingTo(this.targetX, this.targetY, this.targetZ, this.speed);
+                        this.brine.getNavigation().moveTo(this.targetX, this.targetY, this.targetZ, this.speed);
                     }
                     return;
                 }
@@ -257,12 +266,12 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         public BrineSeekWaterGoal(BrineEntity brine, double speed) {
             this.brine = brine;
             this.speed = speed;
-            this.setControls(EnumSet.of(Goal.Control.MOVE));
+            this.setFlags(EnumSet.of(Goal.Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
-            if (this.brine.isTouchingWater()) {
+        public boolean canUse() {
+            if (this.brine.isInWater()) {
                 return false;
             }
 
@@ -271,16 +280,16 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
-            return !this.brine.isTouchingWater() &&
+        public boolean canContinueToUse() {
+            return !this.brine.isInWater() &&
                     this.targetWaterPos != null &&
-                    !this.brine.getNavigation().isIdle();
+                    !this.brine.getNavigation().isDone();
         }
 
         @Override
         public void start() {
             if (this.targetWaterPos != null) {
-                this.brine.getNavigation().startMovingTo(
+                this.brine.getNavigation().moveTo(
                         this.targetWaterPos.getX() + 0.5,
                         this.targetWaterPos.getY() + 0.5,
                         this.targetWaterPos.getZ() + 0.5,
@@ -295,14 +304,14 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         private BlockPos findDeepWater() {
-            BlockPos entityPos = this.brine.getBlockPos();
+            BlockPos entityPos = this.brine.blockPosition();
             int searchRange = 16;
 
             for (int range = 4; range <= searchRange; range += 4) {
                 for (int x = -range; x <= range; x += 2) {
                     for (int y = -8; y <= 8; y += 2) {
                         for (int z = -range; z <= range; z += 2) {
-                            BlockPos checkPos = entityPos.add(x, y, z);
+                            BlockPos checkPos = entityPos.offset(x, y, z);
 
                             if (isDeepWater(checkPos)) {
                                 return checkPos;
@@ -315,9 +324,9 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         private boolean isDeepWater(BlockPos pos) {
-            World world = this.brine.getEntityWorld();
-            return world.getFluidState(pos).isIn(FluidTags.WATER) &&
-                    world.getFluidState(pos.up()).isIn(FluidTags.WATER);
+            Level world = this.brine.level();
+            return world.getFluidState(pos).is(FluidTags.WATER) &&
+                    world.getFluidState(pos.above()).is(FluidTags.WATER);
         }
     }
 
@@ -330,14 +339,14 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         public void tick() {
-            if (this.brine.isFullySubmerged() && this.state == State.MOVE_TO) {
-                Vec3d vec3d = new Vec3d(this.targetX - this.brine.getX(),
-                        this.targetY - this.brine.getY(),
-                        this.targetZ - this.brine.getZ());
+            if (this.brine.isFullySubmerged() && this.operation == Operation.MOVE_TO) {
+                Vec3 vec3d = new Vec3(this.wantedX - this.brine.getX(),
+                        this.wantedY - this.brine.getY(),
+                        this.wantedZ - this.brine.getZ());
                 double d = vec3d.length();
 
                 if (d < 0.5) {
-                    this.state = State.WAIT;
+                    this.operation = Operation.WAIT;
                     this.brine.setMoving(false);
                     return;
                 }
@@ -346,20 +355,20 @@ public class BrineEntity extends HostileWaterCreatureEntity {
                 double f = vec3d.y / d;
                 double g = vec3d.z / d;
 
-                float h = (float)(MathHelper.atan2(vec3d.z, vec3d.x) * 57.2957763671875) - 90.0F;
-                this.brine.setYaw(this.wrapDegrees(this.brine.getYaw(), h, 90.0F));
-                this.brine.bodyYaw = this.brine.getYaw();
+                float h = (float)(Mth.atan2(vec3d.z, vec3d.x) * 57.2957763671875) - 90.0F;
+                this.brine.setYRot(this.rotlerp(this.brine.getYRot(), h, 90.0F));
+                this.brine.yBodyRot = this.brine.getYRot();
 
-                float i = (float)(this.speed * this.brine.getAttributeValue(EntityAttributes.MOVEMENT_SPEED));
-                float j = MathHelper.lerp(0.125F, this.brine.getMovementSpeed(), i);
-                this.brine.setMovementSpeed(j);
+                float i = (float)(this.speedModifier * this.brine.getAttributeValue(Attributes.MOVEMENT_SPEED));
+                float j = Mth.lerp(0.125F, this.brine.getSpeed(), i);
+                this.brine.setSpeed(j);
 
-                double k = Math.sin((double)(this.brine.age + this.brine.getId()) * 0.5) * 0.05;
-                double l = Math.cos((double)(this.brine.getYaw() * 0.017453292F));
-                double m = Math.sin((double)(this.brine.getYaw() * 0.017453292F));
-                double n = Math.sin((double)(this.brine.age + this.brine.getId()) * 0.75) * 0.05;
+                double k = Math.sin((double)(this.brine.tickCount + this.brine.getId()) * 0.5) * 0.05;
+                double l = Math.cos((double)(this.brine.getYRot() * 0.017453292F));
+                double m = Math.sin((double)(this.brine.getYRot() * 0.017453292F));
+                double n = Math.sin((double)(this.brine.tickCount + this.brine.getId()) * 0.75) * 0.05;
 
-                this.brine.setVelocity(this.brine.getVelocity().add(
+                this.brine.setDeltaMovement(this.brine.getDeltaMovement().add(
                         k * l,
                         n * (m + l) * 0.25 + (double)j * f * 0.1,
                         k * m
@@ -369,20 +378,20 @@ public class BrineEntity extends HostileWaterCreatureEntity {
                 double o = this.brine.getX() + e * 2.0;
                 double p = this.brine.getEyeY() + f / d;
                 double q = this.brine.getZ() + g * 2.0;
-                double r = lookControl.getLookX();
-                double s = lookControl.getLookY();
-                double t = lookControl.getLookZ();
+                double r = lookControl.getWantedX();
+                double s = lookControl.getWantedY();
+                double t = lookControl.getWantedZ();
 
-                if (!lookControl.isLookingAtSpecificPosition()) {
+                if (!lookControl.isLookingAtTarget()) {
                     r = o;
                     s = p;
                     t = q;
                 }
 
-                this.brine.getLookControl().lookAt(
-                        MathHelper.lerp(0.125, r, o),
-                        MathHelper.lerp(0.125, s, p),
-                        MathHelper.lerp(0.125, t, q),
+                this.brine.getLookControl().setLookAt(
+                        Mth.lerp(0.125, r, o),
+                        Mth.lerp(0.125, s, p),
+                        Mth.lerp(0.125, t, q),
                         10.0F, 40.0F
                 );
 
@@ -391,7 +400,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             else {
                 super.tick();
 
-                if (this.state == State.MOVE_TO) {
+                if (this.operation == Operation.MOVE_TO) {
                     this.brine.setMoving(true);
                 } else {
                     this.brine.setMoving(false);
@@ -401,18 +410,18 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     public boolean isMoving() {
-        return this.dataTracker.get(MOVING);
+        return this.entityData.get(MOVING);
     }
 
     void setMoving(boolean moving) {
-        this.dataTracker.set(MOVING, moving);
+        this.entityData.set(MOVING, moving);
     }
 
     private void updateAnimations() {
-        if (this.getEntityWorld().isClient()) {
+        if (this.level().isClientSide()) {
             if (this.brineState == BrineState.SHOOTING) {
                 if (!isAttackAnimationRunning) {
-                    this.attackAnimationState.start(this.age);
+                    this.attackAnimationState.start(this.tickCount);
                     this.isAttackAnimationRunning = true;
                     this.isIdleAnimationRunning = false;
                     this.isUnderwaterAnimationRunning = false;
@@ -423,7 +432,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
                     --this.idleAnimationTimeout;
                     if (this.idleAnimationTimeout <= 0) {
                         this.idleAnimationTimeout = this.random.nextInt(40) + 80;
-                        this.idleAnimationState.start(this.age);
+                        this.idleAnimationState.start(this.tickCount);
                         this.isIdleAnimationRunning = true;
                         this.isAttackAnimationRunning = false;
                         this.isUnderwaterAnimationRunning = false;
@@ -432,7 +441,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             }
             else if (this.brineState == BrineState.UNDERWATER_IDLE) {
                 if (!isUnderwaterAnimationRunning) {
-                    this.underwaterAnimationState.start(this.age);
+                    this.underwaterAnimationState.start(this.tickCount);
                     this.isUnderwaterAnimationRunning = true;
                     this.isIdleAnimationRunning = false;
                     this.isAttackAnimationRunning = false;
@@ -470,8 +479,8 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             this.previousState = this.brineState;
             this.brineState = newState;
 
-            if (!this.getEntityWorld().isClient()) {
-                this.dataTracker.set(DATA_ID_STATE, newState.ordinal());
+            if (!this.level().isClientSide()) {
+                this.entityData.set(DATA_ID_STATE, newState.ordinal());
             } else {
                 startStateAnimation(newState);
             }
@@ -481,7 +490,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     private void startStateAnimation(BrineState state) {
-        if (!this.getEntityWorld().isClient() || animationStartedThisTick) return;
+        if (!this.level().isClientSide() || animationStartedThisTick) return;
 
         animationStartedThisTick = true;
 
@@ -489,21 +498,21 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             case IDLE -> {
                 stopAllAnimations();
                 this.idleAnimationTimeout = this.random.nextInt(40) + 80;
-                this.idleAnimationState.start(this.age);
+                this.idleAnimationState.start(this.tickCount);
                 this.isIdleAnimationRunning = true;
                 this.isUnderwaterAnimationRunning = false;
                 this.isAttackAnimationRunning = false;
             }
             case UNDERWATER_IDLE -> {
                 stopAllAnimations();
-                this.underwaterAnimationState.start(this.age);
+                this.underwaterAnimationState.start(this.tickCount);
                 this.isUnderwaterAnimationRunning = true;
                 this.isIdleAnimationRunning = false;
                 this.isAttackAnimationRunning = false;
             }
             case SHOOTING -> {
                 stopAllAnimations();
-                this.attackAnimationState.start(this.age);
+                this.attackAnimationState.start(this.tickCount);
                 this.isAttackAnimationRunning = true;
                 this.isIdleAnimationRunning = false;
                 this.isUnderwaterAnimationRunning = false;
@@ -512,7 +521,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     private void stopAllAnimations() {
-        if (this.getEntityWorld().isClient()) {
+        if (this.level().isClientSide()) {
             idleAnimationState.stop();
             underwaterAnimationState.stop();
             attackAnimationState.stop();
@@ -520,9 +529,9 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     @Override
-    public void onTrackedDataSet(TrackedData<?> data) {
-        if (DATA_ID_STATE.equals(data) && this.getEntityWorld().isClient()) {
-            BrineState newState = BrineState.values()[this.dataTracker.get(DATA_ID_STATE)];
+    public void onSyncedDataUpdated(EntityDataAccessor<?> data) {
+        if (DATA_ID_STATE.equals(data) && this.level().isClientSide()) {
+            BrineState newState = BrineState.values()[this.entityData.get(DATA_ID_STATE)];
             if (this.brineState != newState && !isChangingState) {
                 isChangingState = true;
 
@@ -534,18 +543,18 @@ public class BrineEntity extends HostileWaterCreatureEntity {
                 isChangingState = false;
             }
         }
-        super.onTrackedDataSet(data);
+        super.onSyncedDataUpdated(data);
     }
 
     @Override
-    protected void initDataTracker(DataTracker.Builder builder) {
-        super.initDataTracker(builder);
-        builder.add(DATA_ID_STATE, BrineState.UNDERWATER_IDLE.ordinal());
-        builder.add(MOVING, false);
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(DATA_ID_STATE, BrineState.UNDERWATER_IDLE.ordinal());
+        builder.define(MOVING, false);
     }
 
     @Override
-    public boolean isPushedByFluids() {
+    public boolean isPushedByFluid() {
         return false;
     }
 
@@ -555,18 +564,18 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     @Override
-    public int getMaxAir() {
+    public int getMaxAirSupply() {
         return 300;
     }
 
     @Override
-    protected int getNextAirUnderwater(int air) {
-        return this.getMaxAir();
+    protected int decreaseAirSupply(int air) {
+        return this.getMaxAirSupply();
     }
 
     @Override
-    protected int getNextAirOnLand(int air) {
-        return this.getMaxAir();
+    protected int increaseAirSupply(int air) {
+        return this.getMaxAirSupply();
     }
 
     public boolean canBreatheFluids() {
@@ -575,9 +584,9 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
     @Override
     public void baseTick() {
-        int maxAir = this.getMaxAir();
-        if (this.getAir() < maxAir) {
-            this.setAir(maxAir);
+        int maxAir = this.getMaxAirSupply();
+        if (this.getAirSupply() < maxAir) {
+            this.setAirSupply(maxAir);
         }
         super.baseTick();
     }
@@ -594,7 +603,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
     @Override
     public void tick() {
-        if (this.isRemoved() || this.getEntityWorld() == null) {
+        if (this.isRemoved() || this.level() == null) {
             return;
         }
 
@@ -612,7 +621,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         if (this.getBrineState() == BrineState.SHOOTING) {
             shootingStateTimer++;
 
-            if (shootingStateTimer == 20 && !this.getEntityWorld().isClient()) {
+            if (shootingStateTimer == 20 && !this.level().isClientSide()) {
                 fireWaterCharge();
             }
 
@@ -633,14 +642,14 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     @Override
-    public void tickMovement() {
-        super.tickMovement();
+    public void aiStep() {
+        super.aiStep();
 
-        if (this.isTouchingWater()) {
-            this.setAir(300);
+        if (this.isInWater()) {
+            this.setAirSupply(300);
         }
 
-        if (this.isSubmergedIn(FluidTags.WATER) || this.touchingWater) {
+        if (this.isEyeInFluid(FluidTags.WATER) || this.wasTouchingWater) {
             handleUnderwaterAnimationState();
         } else {
             handleOutOfWaterAnimationState();
@@ -666,21 +675,21 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     @Override
-    public void travel(Vec3d movementInput) {
+    public void travel(Vec3 movementInput) {
         if (this.isFullySubmerged()) {
-            this.updateVelocity(0.02F, movementInput);
-            this.move(MovementType.SELF, this.getVelocity());
-            this.setVelocity(this.getVelocity().multiply(0.9));
+            this.moveRelative(0.02F, movementInput);
+            this.move(MoverType.SELF, this.getDeltaMovement());
+            this.setDeltaMovement(this.getDeltaMovement().scale(0.9));
 
             if (!this.isMoving() && this.getTarget() == null) {
-                this.setVelocity(this.getVelocity().add(0.0, -0.003, 0.0));
+                this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.003, 0.0));
             }
-        } else if (this.isTouchingWater()) {
-            this.updateVelocity(0.1F, movementInput);
-            this.move(MovementType.SELF, this.getVelocity());
-            this.setVelocity(this.getVelocity().multiply(0.8));
+        } else if (this.isInWater()) {
+            this.moveRelative(0.1F, movementInput);
+            this.move(MoverType.SELF, this.getDeltaMovement());
+            this.setDeltaMovement(this.getDeltaMovement().scale(0.8));
 
-            this.setVelocity(this.getVelocity().add(0.0, -0.04, 0.0));
+            this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.04, 0.0));
         } else {
             super.travel(movementInput);
         }
@@ -696,54 +705,54 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
         @Override
         public void tick() {
-            if (this.state != State.MOVE_TO) {
+            if (this.operation != Operation.MOVE_TO) {
                 this.brine.setMoving(false);
-                this.brine.setMovementSpeed(0.0F);
+                this.brine.setSpeed(0.0F);
                 return;
             }
 
-            double dx = this.targetX - this.brine.getX();
-            double dy = this.targetY - this.brine.getY();
-            double dz = this.targetZ - this.brine.getZ();
+            double dx = this.wantedX - this.brine.getX();
+            double dy = this.wantedY - this.brine.getY();
+            double dz = this.wantedZ - this.brine.getZ();
             double distanceSquared = dx * dx + dy * dy + dz * dz;
 
             if (distanceSquared < 0.25) {
-                this.brine.setMovementSpeed(0.0F);
+                this.brine.setSpeed(0.0F);
                 this.brine.setMoving(false);
                 return;
             }
 
             double distance = Math.sqrt(distanceSquared);
 
-            float targetYaw = (float)(MathHelper.atan2(dz, dx) * 57.2957763671875) - 90.0F;
-            this.brine.setYaw(this.wrapDegrees(this.brine.getYaw(), targetYaw, 90.0F));
-            this.brine.bodyYaw = this.brine.getYaw();
+            float targetYaw = (float)(Mth.atan2(dz, dx) * 57.2957763671875) - 90.0F;
+            this.brine.setYRot(this.rotlerp(this.brine.getYRot(), targetYaw, 90.0F));
+            this.brine.yBodyRot = this.brine.getYRot();
 
-            float baseSpeed = (float)(this.speed * this.brine.getAttributeValue(EntityAttributes.MOVEMENT_SPEED));
-            float lerpedSpeed = MathHelper.lerp(0.125F, this.brine.getMovementSpeed(), baseSpeed);
-            this.brine.setMovementSpeed(lerpedSpeed);
+            float baseSpeed = (float)(this.speedModifier * this.brine.getAttributeValue(Attributes.MOVEMENT_SPEED));
+            float lerpedSpeed = Mth.lerp(0.125F, this.brine.getSpeed(), baseSpeed);
+            this.brine.setSpeed(lerpedSpeed);
 
             if (this.brine.isFullySubmerged()) {
                 double nx = dx / distance;
                 double ny = dy / distance;
                 double nz = dz / distance;
 
-                double wave1 = Math.sin((double)(this.brine.age + this.brine.getId()) * 0.5) * 0.05;
-                double wave2 = Math.sin((double)(this.brine.age + this.brine.getId()) * 0.75) * 0.05;
-                double yawCos = Math.cos((double)(this.brine.getYaw() * 0.017453292F));
-                double yawSin = Math.sin((double)(this.brine.getYaw() * 0.017453292F));
+                double wave1 = Math.sin((double)(this.brine.tickCount + this.brine.getId()) * 0.5) * 0.05;
+                double wave2 = Math.sin((double)(this.brine.tickCount + this.brine.getId()) * 0.75) * 0.05;
+                double yawCos = Math.cos((double)(this.brine.getYRot() * 0.017453292F));
+                double yawSin = Math.sin((double)(this.brine.getYRot() * 0.017453292F));
 
-                Vec3d currentVel = this.brine.getVelocity();
-                this.brine.setVelocity(currentVel.add(
+                Vec3 currentVel = this.brine.getDeltaMovement();
+                this.brine.setDeltaMovement(currentVel.add(
                         nx * baseSpeed * 0.1 + wave1 * yawCos,
                         ny * baseSpeed * 0.1 + wave2 * (yawSin + yawCos) * 0.25,
                         nz * baseSpeed * 0.1 + wave1 * yawSin
                 ));
 
-                this.brine.getLookControl().lookAt(this.targetX, this.targetY, this.targetZ, 10.0F, 40.0F);
+                this.brine.getLookControl().setLookAt(this.wantedX, this.wantedY, this.wantedZ, 10.0F, 40.0F);
                 this.brine.setMoving(true);
             } else {
-                this.brine.setForwardSpeed(lerpedSpeed);
+                this.brine.setZza(lerpedSpeed);
                 this.brine.setMoving(true);
             }
         }
@@ -761,20 +770,20 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         public BrineHybridSwimGoal(BrineEntity brine, double speed) {
             this.brine = brine;
             this.speed = speed;
-            this.setControls(EnumSet.of(Goal.Control.MOVE));
+            this.setFlags(EnumSet.of(Goal.Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
-            if (!this.brine.isTouchingWater() || this.brine.getTarget() != null) {
+        public boolean canUse() {
+            if (!this.brine.isInWater() || this.brine.getTarget() != null) {
                 return false;
             }
             return this.brine.getRandom().nextInt(40) == 0;
         }
 
         @Override
-        public boolean shouldContinue() {
-            return this.brine.isTouchingWater() && this.retargetTimer > 0;
+        public boolean canContinueToUse() {
+            return this.brine.isInWater() && this.retargetTimer > 0;
         }
 
         @Override
@@ -786,14 +795,14 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         @Override
         public void stop() {
             this.retargetTimer = 0;
-            this.brine.getMoveControl().moveTo(this.brine.getX(), this.brine.getY(), this.brine.getZ(), this.speed);
+            this.brine.getMoveControl().setWantedPosition(this.brine.getX(), this.brine.getY(), this.brine.getZ(), this.speed);
         }
 
         @Override
         public void tick() {
             this.retargetTimer--;
 
-            double distSq = this.brine.squaredDistanceTo(this.targetX, this.targetY, this.targetZ);
+            double distSq = this.brine.distanceToSqr(this.targetX, this.targetY, this.targetZ);
 
             if (distSq < 2.0 || this.retargetTimer <= 0 || this.retargetTimer % 80 == 0) {
                 this.pickNewTarget();
@@ -808,7 +817,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         private void pickNewTarget() {
-            Vec3d pos = this.brine.getEntityPos();
+            Vec3 pos = this.brine.position();
             int range = 15;
 
             for (int i = 0; i < 30; i++) {
@@ -826,7 +835,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
                 if (!this.brine.isWithinHomeBounds(testPos)) continue;
 
-                if (this.brine.getEntityWorld().getFluidState(testPos).isIn(FluidTags.WATER)) {
+                if (this.brine.level().getFluidState(testPos).is(FluidTags.WATER)) {
                     this.targetX = px;
                     this.targetY = py;
                     this.targetZ = pz;
@@ -839,9 +848,9 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
         private void applyMovement() {
             if (this.usingVelocityMode) {
-                this.brine.getMoveControl().moveTo(this.targetX, this.targetY, this.targetZ, this.speed);
+                this.brine.getMoveControl().setWantedPosition(this.targetX, this.targetY, this.targetZ, this.speed);
             } else {
-                this.brine.getNavigation().startMovingTo(this.targetX, this.targetY, this.targetZ, this.speed);
+                this.brine.getNavigation().moveTo(this.targetX, this.targetY, this.targetZ, this.speed);
             }
         }
     }
@@ -851,12 +860,12 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     public float getLeftVisionAngle() {
-        return this.getYaw() - 90.0F;
+        return this.getYRot() - 90.0F;
     }
 
     private void updateMovementTracking() {
         if (lastShootPosition != null) {
-            Vec3d currentPos = this.getEntityPos();
+            Vec3 currentPos = this.position();
             if (currentPos != null) {
                 double distanceMoved = currentPos.distanceTo(lastShootPosition);
 
@@ -868,12 +877,12 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     private boolean isNearbyProjectileDangerous() {
-        if (this.getEntityWorld() == null) return false;
+        if (this.level() == null) return false;
 
         try {
-            List<WaterChargeProjectileEntity> projectiles = this.getEntityWorld().getEntitiesByClass(
+            List<WaterChargeProjectileEntity> projectiles = this.level().getEntitiesOfClass(
                     WaterChargeProjectileEntity.class,
-                    this.getBoundingBox().expand(PROJECTILE_DANGER_RADIUS),
+                    this.getBoundingBox().inflate(PROJECTILE_DANGER_RADIUS),
                     projectile -> projectile != null && projectile.getOwner() != this
             );
 
@@ -884,12 +893,12 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     private boolean isNearFriendlyProjectile() {
-        if (this.getEntityWorld() == null) return false;
+        if (this.level() == null) return false;
 
         try {
-            List<WaterChargeProjectileEntity> friendlyProjectiles = this.getEntityWorld().getEntitiesByClass(
+            List<WaterChargeProjectileEntity> friendlyProjectiles = this.level().getEntitiesOfClass(
                     WaterChargeProjectileEntity.class,
-                    this.getBoundingBox().expand(FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS),
+                    this.getBoundingBox().inflate(FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS),
                     projectile -> projectile != null && projectile.getOwner() instanceof BrineEntity && projectile.getOwner() != this
             );
 
@@ -899,24 +908,24 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
     }
 
-    private Vec3d getProjectileAvoidanceDirection() {
-        if (this.getEntityWorld() == null) return null;
+    private Vec3 getProjectileAvoidanceDirection() {
+        if (this.level() == null) return null;
 
         try {
-            List<WaterChargeProjectileEntity> projectiles = this.getEntityWorld().getEntitiesByClass(
+            List<WaterChargeProjectileEntity> projectiles = this.level().getEntitiesOfClass(
                     WaterChargeProjectileEntity.class,
-                    this.getBoundingBox().expand(Math.max(PROJECTILE_DANGER_RADIUS, FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS)),
+                    this.getBoundingBox().inflate(Math.max(PROJECTILE_DANGER_RADIUS, FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS)),
                     projectile -> projectile != null && projectile.getOwner() != this
             );
 
             if (projectiles.isEmpty()) return null;
 
-            Vec3d avoidanceDirection = Vec3d.ZERO;
+            Vec3 avoidanceDirection = Vec3.ZERO;
             for (WaterChargeProjectileEntity projectile : projectiles) {
-                if (projectile != null && projectile.getEntityPos() != null) {
-                    Vec3d directionAway = this.getEntityPos().subtract(projectile.getEntityPos()).normalize();
+                if (projectile != null && projectile.position() != null) {
+                    Vec3 directionAway = this.position().subtract(projectile.position()).normalize();
                     double weight = (projectile.getOwner() instanceof BrineEntity) ? 1.5 : 1.0;
-                    avoidanceDirection = avoidanceDirection.add(directionAway.multiply(weight));
+                    avoidanceDirection = avoidanceDirection.add(directionAway.scale(weight));
                 }
             }
 
@@ -952,7 +961,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
         shootCooldown = 40 + this.random.nextInt(20);
         this.setBrineState(BrineState.SHOOTING);
-        lastShootPosition = this.getEntityPos();
+        lastShootPosition = this.position();
         hasMovedEnoughToShoot = false;
         shootingDelay = 5 + this.random.nextInt(10);
     }
@@ -961,54 +970,54 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         LivingEntity target = this.getTarget();
         if (target == null || !target.isAlive() || target.isRemoved()) return;
 
-        Vec3d targetPos = predictTargetPosition(target);
+        Vec3 targetPos = predictTargetPosition(target);
         if (targetPos == null) return;
 
-        Vec3d direction = targetPos.subtract(this.getEntityPos()).normalize();
+        Vec3 direction = targetPos.subtract(this.position()).normalize();
 
         try {
-            WaterChargeProjectileEntity charge = new WaterChargeProjectileEntity(ModEntities.WATER_CHARGE, this.getEntityWorld());
+            WaterChargeProjectileEntity charge = new WaterChargeProjectileEntity(ModEntities.WATER_CHARGE, this.level());
             charge.setOwner(this);
-            charge.setPosition(this.getX(), this.getEyeY(), this.getZ());
-            charge.setVelocity(direction.x, direction.y, direction.z, 1.2f, 0.05f);
-            this.getEntityWorld().spawnEntity(charge);
+            charge.setPos(this.getX(), this.getEyeY(), this.getZ());
+            charge.shoot(direction.x, direction.y, direction.z, 1.2f, 0.05f);
+            this.level().addFreshEntity(charge);
         } catch (Exception e) {
         }
     }
 
-    private Vec3d predictTargetPosition(LivingEntity target) {
+    private Vec3 predictTargetPosition(LivingEntity target) {
         if (target == null || !target.isAlive() || target.isRemoved()) {
-            return this.getEntityPos();
+            return this.position();
         }
 
         try {
-            Vec3d targetVelocity = target.getVelocity();
+            Vec3 targetVelocity = target.getDeltaMovement();
             if (targetVelocity == null) {
-                targetVelocity = Vec3d.ZERO;
+                targetVelocity = Vec3.ZERO;
             }
 
             double projectileSpeed = 1.2;
             double distance = this.distanceTo(target);
             double timeToHit = distance / projectileSpeed;
 
-            Vec3d predictedPos = target.getEntityPos().add(targetVelocity.multiply(timeToHit));
-            return predictedPos.add(0, target.getStandingEyeHeight() - 1.0, 0);
+            Vec3 predictedPos = target.position().add(targetVelocity.scale(timeToHit));
+            return predictedPos.add(0, target.getEyeHeight() - 1.0, 0);
         } catch (Exception e) {
-            return target.getEntityPos();
+            return target.position();
         }
     }
 
     private static class BrineAvoidProjectileGoal extends Goal {
         private final BrineEntity brine;
-        private Vec3d avoidanceDirection;
+        private Vec3 avoidanceDirection;
 
         public BrineAvoidProjectileGoal(BrineEntity brine) {
             this.brine = brine;
-            this.setControls(EnumSet.of(Control.MOVE));
+            this.setFlags(EnumSet.of(Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             if (brine.getBrineState() != BrineState.UNDERWATER_IDLE &&
                     brine.getBrineState() != BrineState.IDLE) return false;
 
@@ -1019,13 +1028,13 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         @Override
         public void tick() {
             if (avoidanceDirection != null) {
-                Vec3d targetPos = brine.getEntityPos().add(avoidanceDirection.multiply(6.0));
-                brine.getMoveControl().moveTo(targetPos.x, targetPos.y, targetPos.z, 1.5);
+                Vec3 targetPos = brine.position().add(avoidanceDirection.scale(6.0));
+                brine.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, 1.5);
             }
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             return (brine.isNearbyProjectileDangerous() || brine.isNearFriendlyProjectile()) &&
                     (brine.getBrineState() == BrineState.UNDERWATER_IDLE ||
                             brine.getBrineState() == BrineState.IDLE);
@@ -1038,11 +1047,11 @@ public class BrineEntity extends HostileWaterCreatureEntity {
 
         public BrineShootGoal(BrineEntity brine) {
             this.brine = brine;
-            this.setControls(EnumSet.of(Control.LOOK));
+            this.setFlags(EnumSet.of(Flag.LOOK));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             LivingEntity target = brine.getTarget();
             return target != null &&
                     brine.shootCooldown <= 0 &&
@@ -1064,7 +1073,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
             if (target != null && target.isAlive() && !target.isRemoved() &&
                     brine.getBrineState() != BrineState.SHOOTING) {
                 try {
-                    brine.getLookControl().lookAt(target.getX(), target.getEyeY(), target.getZ());
+                    brine.getLookControl().setLookAt(target.getX(), target.getEyeY(), target.getZ());
 
                     if (--aimTimer <= 0) {
                         brine.tryShootAtTarget();
@@ -1077,7 +1086,7 @@ public class BrineEntity extends HostileWaterCreatureEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             LivingEntity target = brine.getTarget();
             return target != null &&
                     brine.getBrineState() != BrineState.SHOOTING &&
@@ -1092,8 +1101,8 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     @Override
-    public void writeCustomData(WriteView nbt) {
-        super.writeCustomData(nbt);
+    public void addAdditionalSaveData(ValueOutput nbt) {
+        super.addAdditionalSaveData(nbt);
         nbt.putString("BrineState", brineState.name());
         nbt.putBoolean("HasMovedEnoughToShoot", hasMovedEnoughToShoot);
         nbt.putInt("ShootingDelay", shootingDelay);
@@ -1113,39 +1122,39 @@ public class BrineEntity extends HostileWaterCreatureEntity {
     }
 
     @Override
-    public void readCustomData(ReadView nbt) {
-        super.readCustomData(nbt);
-        String stateString = nbt.getString("BrineState", "UNDERWATER_IDLE");
+    public void readAdditionalSaveData(ValueInput nbt) {
+        super.readAdditionalSaveData(nbt);
+        String stateString = nbt.getStringOr("BrineState", "UNDERWATER_IDLE");
         if (!stateString.equals("UNDERWATER_IDLE")) {
             try {
                 BrineState loadedState = BrineState.valueOf(stateString);
                 this.brineState = loadedState;
-                if (!this.getEntityWorld().isClient()) {
-                    this.dataTracker.set(DATA_ID_STATE, loadedState.ordinal());
+                if (!this.level().isClientSide()) {
+                    this.entityData.set(DATA_ID_STATE, loadedState.ordinal());
                 }
             } catch (IllegalArgumentException e) {
                 this.brineState = BrineState.UNDERWATER_IDLE;
             }
         }
 
-        this.hasMovedEnoughToShoot = nbt.getBoolean("HasMovedEnoughToShoot", false);
-        this.shootingDelay = nbt.getInt("ShootingDelay", 0);
-        this.shootCooldown = nbt.getInt("ShootCooldown", 0);
+        this.hasMovedEnoughToShoot = nbt.getBooleanOr("HasMovedEnoughToShoot", false);
+        this.shootingDelay = nbt.getIntOr("ShootingDelay", 0);
+        this.shootCooldown = nbt.getIntOr("ShootCooldown", 0);
 
-        double lastShootX = nbt.getDouble("LastShootX", Double.NaN);
+        double lastShootX = nbt.getDoubleOr("LastShootX", Double.NaN);
         if (!Double.isNaN(lastShootX)) {
-            this.lastShootPosition = new Vec3d(
+            this.lastShootPosition = new Vec3(
                     lastShootX,
-                    nbt.getDouble("LastShootY", 0.0),
-                    nbt.getDouble("LastShootZ", 0.0)
+                    nbt.getDoubleOr("LastShootY", 0.0),
+                    nbt.getDoubleOr("LastShootZ", 0.0)
             );
         }
 
         if (nbt.contains("HomeX")) {
             this.homePos = new BlockPos(
-                    nbt.getInt("HomeX", 0),
-                    nbt.getInt("HomeY", 0),
-                    nbt.getInt("HomeZ", 0)
+                    nbt.getIntOr("HomeX", 0),
+                    nbt.getIntOr("HomeY", 0),
+                    nbt.getIntOr("HomeZ", 0)
             );
         }
     }

@@ -1,38 +1,39 @@
 package potatowolfie.earth_and_water.mixin;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.ConduitBlockEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import potatowolfie.earth_and_water.util.ModTags;
 
 import java.util.List;
 import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.ConduitBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 
 @Mixin(ConduitBlockEntity.class)
 public class ConduitBlockEntityMixin {
 
     @Shadow
     @Final
-    private static Block[] ACTIVATING_BLOCKS;
+    private static Block[] VALID_BLOCKS;
 
     @Inject(
-            method = "updateActivatingBlocks",
+            method = "updateShape",
             at = @At("RETURN"),
             cancellable = true
     )
-    private static void addCustomFrameBlocks(World world, BlockPos pos, List<BlockPos> activatingBlocks, CallbackInfoReturnable<Boolean> cir) {
+    private static void addCustomFrameBlocks(Level world, BlockPos pos, List<BlockPos> activatingBlocks, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValue()) {
             return;
         }
@@ -42,8 +43,8 @@ public class ConduitBlockEntityMixin {
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 for (int k = -1; k <= 1; k++) {
-                    BlockPos waterPos = pos.add(i, j, k);
-                    if (!world.isWater(waterPos)) {
+                    BlockPos waterPos = pos.offset(i, j, k);
+                    if (!world.isWaterAt(waterPos)) {
                         return;
                     }
                 }
@@ -62,17 +63,17 @@ public class ConduitBlockEntityMixin {
                                     j == 0 && (l == 2 || n == 2) ||
                                     k == 0 && (l == 2 || m == 2))) {
 
-                        BlockPos framePos = pos.add(i, j, k);
+                        BlockPos framePos = pos.offset(i, j, k);
                         BlockState blockState = world.getBlockState(framePos);
 
-                        for (Block block : ACTIVATING_BLOCKS) {
-                            if (blockState.isOf(block)) {
+                        for (Block block : VALID_BLOCKS) {
+                            if (blockState.is(block)) {
                                 activatingBlocks.add(framePos);
                                 break;
                             }
                         }
 
-                        if (blockState.isIn(ModTags.Blocks.E_W_CONDUIT_FRAME_BLOCKS)) {
+                        if (blockState.is(ModTags.Blocks.E_W_CONDUIT_FRAME_BLOCKS)) {
                             activatingBlocks.add(framePos);
                         }
                     }
@@ -84,28 +85,17 @@ public class ConduitBlockEntityMixin {
         cir.setReturnValue(hasEnoughBlocks);
     }
 
-    @Redirect(
-            method = "findAttackTarget",
+    @ModifyArg(
+            method = "selectNewTarget",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/server/world/ServerWorld;getEntitiesByClass(Ljava/lang/Class;Lnet/minecraft/util/math/Box;Ljava/util/function/Predicate;)Ljava/util/List;"
+                    target = "Lnet/minecraft/server/level/ServerLevel;getEntitiesOfClass(Ljava/lang/Class;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;"
             )
     )
-    private static List<LivingEntity> filterConduitImmuneEntities(
-            ServerWorld world,
-            Class<LivingEntity> entityClass,
-            Box box,
-            Predicate<? super LivingEntity> predicate) {
-
-        Predicate<LivingEntity> combinedPredicate = entity -> {
-            if (!predicate.test(entity)) {
-                return false;
-            }
-
-            boolean isImmune = entity.getType().isIn(ModTags.Entities.CONDUIT_IMMUNE);
-            return !isImmune;
+    private static Predicate<LivingEntity> injectConduitImmunity(Predicate<LivingEntity> original) {
+        return entity -> {
+            if (!original.test(entity)) return false;
+            return !entity.is(ModTags.Entities.CONDUIT_IMMUNE);
         };
-
-        return world.getEntitiesByClass(entityClass, box, combinedPredicate);
     }
 }

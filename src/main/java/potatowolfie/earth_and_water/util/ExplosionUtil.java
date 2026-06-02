@@ -1,67 +1,70 @@
 package potatowolfie.earth_and_water.util;
 
-import net.minecraft.entity.*;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.world.event.GameEvent;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ExplosionUtil {
 
-    public static void createSilentExplosion(ServerWorld world, Vec3d pos, float power, @Nullable Entity sourceEntity) {
+    public static void createSilentExplosion(ServerLevel world, Vec3 pos, float power, @Nullable Entity sourceEntity) {
         createSilentExplosion(world, pos, power, sourceEntity, null, null, -1, -1);
     }
 
-    public static void createSilentExplosion(ServerWorld world, Vec3d pos, float power, @Nullable Entity sourceEntity, @Nullable Entity directHit) {
+    public static void createSilentExplosion(ServerLevel world, Vec3 pos, float power, @Nullable Entity sourceEntity, @Nullable Entity directHit) {
         createSilentExplosion(world, pos, power, sourceEntity, directHit, null, -1, -1);
     }
 
-    public static void createSilentExplosion(ServerWorld world, Vec3d pos, float power, @Nullable Entity sourceEntity, @Nullable Entity directHit, float customDamage, float knockbackMultiplier) {
+    public static void createSilentExplosion(ServerLevel world, Vec3 pos, float power, @Nullable Entity sourceEntity, @Nullable Entity directHit, float customDamage, float knockbackMultiplier) {
         createSilentExplosion(world, pos, power, sourceEntity, directHit, null, customDamage, knockbackMultiplier);
     }
 
-    public static void createSilentExplosion(ServerWorld world, Vec3d pos, float power, @Nullable Entity sourceEntity, @Nullable Entity directHit, @Nullable DamageSource customDamageSource, float customDamage, float knockbackMultiplier) {
-        world.emitGameEvent(sourceEntity, GameEvent.EXPLODE, pos);
+    public static void createSilentExplosion(ServerLevel world, Vec3 pos, float power, @Nullable Entity sourceEntity, @Nullable Entity directHit, @Nullable DamageSource customDamageSource, float customDamage, float knockbackMultiplier) {
+        world.gameEvent(sourceEntity, GameEvent.EXPLODE, pos);
 
         float radius = power * 2.0F;
-        int minX = MathHelper.floor(pos.x - radius - 1.0);
-        int maxX = MathHelper.floor(pos.x + radius + 1.0);
-        int minY = MathHelper.floor(pos.y - radius - 1.0);
-        int maxY = MathHelper.floor(pos.y + radius + 1.0);
-        int minZ = MathHelper.floor(pos.z - radius - 1.0);
-        int maxZ = MathHelper.floor(pos.z + radius + 1.0);
+        int minX = Mth.floor(pos.x - radius - 1.0);
+        int maxX = Mth.floor(pos.x + radius + 1.0);
+        int minY = Mth.floor(pos.y - radius - 1.0);
+        int maxY = Mth.floor(pos.y + radius + 1.0);
+        int minZ = Mth.floor(pos.z - radius - 1.0);
+        int maxZ = Mth.floor(pos.z + radius + 1.0);
 
-        List<Entity> entities = world.getOtherEntities(
+        List<Entity> entities = world.getEntities(
                 sourceEntity,
-                new Box(minX, minY, minZ, maxX, maxY, maxZ)
+                new AABB(minX, minY, minZ, maxX, maxY, maxZ)
         );
 
-        Map<PlayerEntity, Vec3d> affectedPlayers = new HashMap<>();
-        DamageSource damageSource = customDamageSource != null ? customDamageSource : world.getDamageSources().explosion(sourceEntity, getCausingEntity(sourceEntity));
+        Map<Player, Vec3> affectedPlayers = new HashMap<>();
+        DamageSource damageSource = customDamageSource != null ? customDamageSource : world.damageSources().explosion(sourceEntity, getCausingEntity(sourceEntity));
 
         for (Entity entity : entities) {
             if (entity == directHit || shouldSkipEntity(entity)) {
                 continue;
             }
 
-            Vec3d entityCenter = getEntityCenter(entity);
+            Vec3 entityCenter = getEntityCenter(entity);
             double distance = entityCenter.distanceTo(pos);
             double normalizedDistance = distance / radius;
 
             if (normalizedDistance <= 1.0) {
-                Vec3d direction = entityCenter.subtract(pos);
+                Vec3 direction = entityCenter.subtract(pos);
                 double totalDistance = direction.length();
 
                 if (totalDistance > 0.0) {
@@ -75,7 +78,7 @@ public class ExplosionUtil {
                     }
 
                     if (damage > 0.1f) {
-                        entity.damage(world, damageSource, damage);
+                        entity.hurtServer(world, damageSource, damage);
                     }
 
                     double exposure = getExposure(pos, entity);
@@ -86,26 +89,26 @@ public class ExplosionUtil {
                     }
 
                     if (entity instanceof LivingEntity livingEntity) {
-                        knockbackStrength *= (1.0 - livingEntity.getAttributeValue(EntityAttributes.EXPLOSION_KNOCKBACK_RESISTANCE));
+                        knockbackStrength *= (1.0 - livingEntity.getAttributeValue(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE));
                     }
 
-                    Vec3d knockback = direction.multiply(knockbackStrength);
-                    entity.setVelocity(entity.getVelocity().add(knockback));
+                    Vec3 knockback = direction.scale(knockbackStrength);
+                    entity.setDeltaMovement(entity.getDeltaMovement().add(knockback));
 
-                    if (entity instanceof PlayerEntity player) {
+                    if (entity instanceof Player player) {
                         if (!player.isSpectator() && (!player.isCreative() || !player.getAbilities().flying)) {
                             affectedPlayers.put(player, knockback);
                         }
                     }
 
-                    entity.onExplodedBy(sourceEntity);
+                    entity.onExplosionHit(sourceEntity);
                 }
             }
         }
 
-        for (Map.Entry<PlayerEntity, Vec3d> entry : affectedPlayers.entrySet()) {
-            PlayerEntity player = entry.getKey();
-            player.velocityDirty = true;
+        for (Map.Entry<Player, Vec3> entry : affectedPlayers.entrySet()) {
+            Player player = entry.getKey();
+            player.needsSync = true;
         }
     }
 
@@ -113,16 +116,16 @@ public class ExplosionUtil {
         if (entity instanceof ItemEntity) {
             return true;
         }
-        if (entity instanceof ExperienceOrbEntity) {
+        if (entity instanceof ExperienceOrb) {
             return true;
         }
 
         return false;
     }
 
-    private static Vec3d getEntityCenter(Entity entity) {
-        Box box = entity.getBoundingBox();
-        return new Vec3d(
+    private static Vec3 getEntityCenter(Entity entity) {
+        AABB box = entity.getBoundingBox();
+        return new Vec3(
                 (box.minX + box.maxX) * 0.5,
                 (box.minY + box.maxY) * 0.5,
                 (box.minZ + box.maxZ) * 0.5
@@ -139,8 +142,8 @@ public class ExplosionUtil {
         return (float) (maxDamage * (1.0 - distance));
     }
 
-    private static float getExposure(Vec3d source, Entity entity) {
-        Box box = entity.getBoundingBox();
+    private static float getExposure(Vec3 source, Entity entity) {
+        AABB box = entity.getBoundingBox();
         double stepX = 1.0 / ((box.maxX - box.minX) * 2.0 + 1.0);
         double stepY = 1.0 / ((box.maxY - box.minY) * 2.0 + 1.0);
         double stepZ = 1.0 / ((box.maxZ - box.minZ) * 2.0 + 1.0);
@@ -157,15 +160,15 @@ public class ExplosionUtil {
         for (double x = 0.0; x <= 1.0; x += stepX) {
             for (double y = 0.0; y <= 1.0; y += stepY) {
                 for (double z = 0.0; z <= 1.0; z += stepZ) {
-                    double pointX = MathHelper.lerp(x, box.minX, box.maxX);
-                    double pointY = MathHelper.lerp(y, box.minY, box.maxY);
-                    double pointZ = MathHelper.lerp(z, box.minZ, box.maxZ);
-                    Vec3d point = new Vec3d(pointX + offsetX, pointY, pointZ + offsetZ);
+                    double pointX = Mth.lerp(x, box.minX, box.maxX);
+                    double pointY = Mth.lerp(y, box.minY, box.maxY);
+                    double pointZ = Mth.lerp(z, box.minZ, box.maxZ);
+                    Vec3 point = new Vec3(pointX + offsetX, pointY, pointZ + offsetZ);
 
-                    if (entity.getEntityWorld().raycast(new RaycastContext(
+                    if (entity.level().clip(new ClipContext(
                             point, source,
-                            RaycastContext.ShapeType.COLLIDER,
-                            RaycastContext.FluidHandling.NONE,
+                            ClipContext.Block.COLLIDER,
+                            ClipContext.Fluid.NONE,
                             entity
                     )).getType() == HitResult.Type.MISS) {
                         visiblePoints++;
@@ -182,11 +185,11 @@ public class ExplosionUtil {
     private static LivingEntity getCausingEntity(@Nullable Entity from) {
         if (from == null) {
             return null;
-        } else if (from instanceof TntEntity tntEntity) {
+        } else if (from instanceof PrimedTnt tntEntity) {
             return tntEntity.getOwner();
         } else if (from instanceof LivingEntity livingEntity) {
             return livingEntity;
-        } else if (from instanceof ProjectileEntity projectileEntity) {
+        } else if (from instanceof Projectile projectileEntity) {
             Entity owner = projectileEntity.getOwner();
             if (owner instanceof LivingEntity livingEntity) {
                 return livingEntity;
@@ -195,7 +198,7 @@ public class ExplosionUtil {
         return null;
     }
 
-    public static void createSilentExplosion(ServerWorld world, Vec3d pos, float radius, float damage, double areaKnockback, double directHitKnockback, @Nullable Entity directHit) {
+    public static void createSilentExplosion(ServerLevel world, Vec3 pos, float radius, float damage, double areaKnockback, double directHitKnockback, @Nullable Entity directHit) {
         createSilentExplosion(world, pos, radius, null, directHit, null, damage, (float)areaKnockback);
     }
 }

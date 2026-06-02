@@ -1,61 +1,70 @@
 package potatowolfie.earth_and_water.entity.water_charge;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import potatowolfie.earth_and_water.EarthWater;
 import potatowolfie.earth_and_water.entity.client.ModEntityModelLayers;
 
 @Environment(EnvType.CLIENT)
 public class WaterChargeProjectileRenderer extends EntityRenderer<WaterChargeProjectileEntity, WaterChargeProjectileRenderState> {
-    private static final float field_52258 = MathHelper.square(3.5F);
-    public static final Identifier TEXTURE = Identifier.of(EarthWater.MOD_ID, "textures/entity/water_charge/water_charge.png");
+    private static final float field_52258 = Mth.square(3.5F);
+    public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "textures/entity/water_charge/water_charge.png");
     protected WaterChargeProjectileModel model;
 
-    public WaterChargeProjectileRenderer(EntityRendererFactory.Context ctx) {
+    public WaterChargeProjectileRenderer(EntityRendererProvider.Context ctx) {
         super(ctx);
-        model = new WaterChargeProjectileModel(ctx.getPart(ModEntityModelLayers.WATER_CHARGE));
+        model = new WaterChargeProjectileModel(ctx.bakeLayer(ModEntityModelLayers.WATER_CHARGE));
     }
 
-    public void render(WaterChargeProjectileRenderState waterChargeProjectileRenderState, MatrixStack matrixStack, OrderedRenderCommandQueue orderedRenderCommandQueue, CameraRenderState cameraRenderState) {
-        if (waterChargeProjectileRenderState.age >= 2 || waterChargeProjectileRenderState.distanceFromCamera >= field_52258) {
-            matrixStack.push();
+    @Override
+    public void submit(final WaterChargeProjectileRenderState state,
+                       final PoseStack poseStack,
+                       final SubmitNodeCollector submitNodeCollector,
+                       final CameraRenderState camera) {
 
-            matrixStack.translate(0, 1.525, 0);
+        if (state.ageInTicks >= 2 || state.distanceFromCamera >= field_52258) {
 
-            if (waterChargeProjectileRenderState.isStuck) {
-                if (waterChargeProjectileRenderState.isStuckToEntity) {
-                    matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(waterChargeProjectileRenderState.renderingRotation));
+            poseStack.pushPose();
+
+            poseStack.translate(0.0, 1.525, 0.0);
+
+            if (state.isStuck) {
+
+                if (state.isStuckToEntity) {
+                    poseStack.mulPose(Axis.YP.rotationDegrees(state.renderingRotation));
                 } else {
-                    matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(waterChargeProjectileRenderState.yaw));
-                    matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(waterChargeProjectileRenderState.pitch));
+                    poseStack.mulPose(Axis.YP.rotationDegrees(state.yaw));
+                    poseStack.mulPose(Axis.XP.rotationDegrees(state.pitch));
                 }
-            } else if (waterChargeProjectileRenderState.isGrounded) {
-                matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(waterChargeProjectileRenderState.yaw));
-                matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(waterChargeProjectileRenderState.pitch));
+
+            } else if (state.isGrounded) {
+                poseStack.mulPose(Axis.YP.rotationDegrees(state.yaw));
+                poseStack.mulPose(Axis.XP.rotationDegrees(state.pitch));
             }
 
-            matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180));
+            poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
 
-            if (!waterChargeProjectileRenderState.isStuck) {
-                matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(waterChargeProjectileRenderState.renderingRotation));
+            if (!state.isStuck) {
+                poseStack.mulPose(Axis.YP.rotationDegrees(state.renderingRotation));
             }
 
-            this.model.setAngles(waterChargeProjectileRenderState);
-            orderedRenderCommandQueue.submitModelPart(
-                    this.model.getRootPart(),
-                    matrixStack,
-                    this.model.getLayer(TEXTURE),
-                    waterChargeProjectileRenderState.light,
-                    OverlayTexture.DEFAULT_UV,
+            this.model.setAngles(state);
+
+            submitNodeCollector.submitModelPart(
+                    this.model.root(),
+                    poseStack,
+                    this.model.renderType(TEXTURE),
+                    state.lightCoords,
+                    OverlayTexture.NO_OVERLAY,
                     null,
                     false,
                     false,
@@ -64,8 +73,9 @@ public class WaterChargeProjectileRenderer extends EntityRenderer<WaterChargePro
                     0
             );
 
-            matrixStack.pop();
-            super.render(waterChargeProjectileRenderState, matrixStack, orderedRenderCommandQueue, cameraRenderState);
+            poseStack.popPose();
+
+            super.submit(state, poseStack, submitNodeCollector, camera);
         }
     }
 
@@ -77,18 +87,24 @@ public class WaterChargeProjectileRenderer extends EntityRenderer<WaterChargePro
         return new WaterChargeProjectileRenderState();
     }
 
-    public void updateRenderState(WaterChargeProjectileEntity waterChargeProjectileEntity, WaterChargeProjectileRenderState waterChargeProjectileRenderState, float f) {
-        super.updateRenderState(waterChargeProjectileEntity, waterChargeProjectileRenderState, f);
-        waterChargeProjectileRenderState.isStuck = waterChargeProjectileEntity.isStuck();
-        waterChargeProjectileRenderState.isStuckToEntity = waterChargeProjectileEntity.isStuckToEntity();
-        waterChargeProjectileRenderState.isGrounded = waterChargeProjectileEntity.isGrounded();
-        waterChargeProjectileRenderState.renderingRotation = waterChargeProjectileEntity.getRenderingRotation();
-        waterChargeProjectileRenderState.yaw = waterChargeProjectileEntity.getYaw();
-        waterChargeProjectileRenderState.pitch = waterChargeProjectileEntity.getPitch();
-        waterChargeProjectileRenderState.distanceFromCamera = (float) waterChargeProjectileEntity.squaredDistanceTo(
-                waterChargeProjectileRenderState.x,
-                waterChargeProjectileRenderState.y,
-                waterChargeProjectileRenderState.z
+    @Override
+    public void extractRenderState(final WaterChargeProjectileEntity entity,
+                                   final WaterChargeProjectileRenderState state,
+                                   final float partialTicks) {
+        super.extractRenderState(entity, state, partialTicks);
+
+        state.isStuck = entity.isStuck();
+        state.isStuckToEntity = entity.isStuckToEntity();
+        state.isGrounded = entity.isGrounded();
+
+        state.renderingRotation = entity.getRenderingRotation();
+        state.yaw = entity.getYRot();
+        state.pitch = entity.getXRot();
+
+        state.distanceFromCamera = (float) entity.distanceToSqr(
+                state.x,
+                state.y,
+                state.z
         );
     }
 }

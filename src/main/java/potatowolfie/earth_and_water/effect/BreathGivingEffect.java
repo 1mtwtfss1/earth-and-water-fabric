@@ -1,26 +1,25 @@
 package potatowolfie.earth_and_water.effect;
 
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffect;
-import net.minecraft.entity.effect.StatusEffectCategory;
-import net.minecraft.entity.player.PlayerEntity;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 
-public class BreathGivingEffect extends StatusEffect {
+public class BreathGivingEffect extends MobEffect {
     private static final int UPDATE_INTERVAL = 1;
     private static final int BASE_AIR_PER_UPDATE = 15;
     private static final float PARTIAL_AIR_THRESHOLD = 0.9f;
     private final Map<UUID, Float> partialAirValues = new HashMap<>();
 
     public BreathGivingEffect() {
-        super(StatusEffectCategory.BENEFICIAL, 0x3CB4FF);
+        super(MobEffectCategory.BENEFICIAL, 0x3CB4FF);
     }
 
     @Override
-    public boolean canApplyUpdateEffect(int duration, int amplifier) {
+    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
         return duration % UPDATE_INTERVAL == 0;
     }
 
@@ -29,17 +28,17 @@ public class BreathGivingEffect extends StatusEffect {
             return false;
         }
 
-        int currentAir = entity.getAir();
-        int maxAir = entity.getMaxAir();
+        int currentAir = entity.getAirSupply();
+        int maxAir = entity.getMaxAirSupply();
         boolean isCreativeOrSpectator = false;
 
-        if (entity instanceof PlayerEntity) {
-            PlayerEntity player = (PlayerEntity) entity;
-            isCreativeOrSpectator = player.isSpectator() || player.getAbilities().creativeMode;
+        if (entity instanceof Player) {
+            Player player = (Player) entity;
+            isCreativeOrSpectator = player.isSpectator() || player.getAbilities().instabuild;
         }
 
         if (currentAir < maxAir || isCreativeOrSpectator) {
-            UUID entityId = entity.getUuid();
+            UUID entityId = entity.getUUID();
             float partialAir = partialAirValues.getOrDefault(entityId, 0f);
             float airToAddFloat = BASE_AIR_PER_UPDATE * (amplifier + 1);
 
@@ -55,7 +54,7 @@ public class BreathGivingEffect extends StatusEffect {
             partialAirValues.put(entityId, remainder);
 
             if (wholeAirToAdd > 0) {
-                entity.setAir(Math.min(currentAir + wholeAirToAdd, maxAir));
+                entity.setAirSupply(Math.min(currentAir + wholeAirToAdd, maxAir));
             }
 
             if (currentAir + wholeAirToAdd >= maxAir && !isCreativeOrSpectator) {
@@ -64,7 +63,7 @@ public class BreathGivingEffect extends StatusEffect {
 
             return true;
         } else {
-            partialAirValues.remove(entity.getUuid());
+            partialAirValues.remove(entity.getUUID());
         }
 
         return false;

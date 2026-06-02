@@ -1,22 +1,23 @@
 package potatowolfie.earth_and_water.world.gen;
 
-import net.minecraft.registry.Registerable;
-import net.minecraft.world.gen.feature.ConfiguredFeature;
-import net.minecraft.world.gen.feature.PlacedFeature;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import potatowolfie.earth_and_water.world.feature.ModConfiguredFeatures;
 import potatowolfie.earth_and_water.world.feature.ModPlacedFeatures;
 
 public class ModWorldGeneration {
-    public static void registerConfiguredFeatures(Registerable<ConfiguredFeature<?, ?>> context) {
+    public static void registerConfiguredFeatures(BootstrapContext<ConfiguredFeature<?, ?>> context) {
         ModConfiguredFeatures.bootstrap(context);
     }
 
-    public static void registerPlacedFeatures(Registerable<PlacedFeature> context) {
+    public static void registerPlacedFeatures(BootstrapContext<PlacedFeature> context) {
         ModPlacedFeatures.bootstrap(context);
     }
 
     public static void init() {
         ModOxygenCrossGeneration.addFeatureToBiomes();
         ModDarkDripstoneGeneration.addFeaturesToBiomes();
+        ModLimestoneRockGeneration.addFeaturesToBiomes();
     }
 }

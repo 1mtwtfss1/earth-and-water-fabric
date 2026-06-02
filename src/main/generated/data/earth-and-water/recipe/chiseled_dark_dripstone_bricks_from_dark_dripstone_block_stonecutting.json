@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": "earth-and-water:dark_dripstone_block",
+  "result": {
+    "id": "earth-and-water:chiseled_dark_dripstone_bricks"
+  }
+}

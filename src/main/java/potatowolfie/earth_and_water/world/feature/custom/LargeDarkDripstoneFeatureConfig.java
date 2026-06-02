@@ -2,31 +2,34 @@ package potatowolfie.earth_and_water.world.feature.custom;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.util.math.floatprovider.FloatProvider;
-import net.minecraft.util.math.intprovider.IntProvider;
-import net.minecraft.world.gen.feature.FeatureConfig;
+import net.minecraft.util.valueproviders.FloatProvider;
+import net.minecraft.util.valueproviders.FloatProviders;
+import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.util.valueproviders.IntProviders;
+import net.minecraft.world.level.levelgen.feature.configurations.FeatureConfiguration;
+import net.minecraft.world.level.levelgen.feature.configurations.LargeDripstoneConfiguration;
 
-public class LargeDarkDripstoneFeatureConfig implements FeatureConfig {
-    public static final Codec<LargeDarkDripstoneFeatureConfig> CODEC = RecordCodecBuilder.create((instance) -> {
-        return instance.group(Codec.intRange(1, 512).fieldOf("floor_to_ceiling_search_range").orElse(30).forGetter((config) -> {
-            return config.floorToCeilingSearchRange;
-        }), IntProvider.createValidatingCodec(1, 60).fieldOf("column_radius").forGetter((config) -> {
-            return config.columnRadius;
-        }), FloatProvider.createValidatedCodec(0.0F, 20.0F).fieldOf("height_scale").forGetter((config) -> {
-            return config.heightScale;
-        }), Codec.floatRange(0.1F, 1.0F).fieldOf("max_column_radius_to_cave_height_ratio").forGetter((config) -> {
-            return config.maxColumnRadiusToCaveHeightRatio;
-        }), FloatProvider.createValidatedCodec(0.1F, 10.0F).fieldOf("stalactite_bluntness").forGetter((config) -> {
-            return config.stalactiteBluntness;
-        }), FloatProvider.createValidatedCodec(0.1F, 10.0F).fieldOf("stalagmite_bluntness").forGetter((config) -> {
-            return config.stalagmiteBluntness;
-        }), FloatProvider.createValidatedCodec(0.0F, 2.0F).fieldOf("wind_speed").forGetter((config) -> {
-            return config.windSpeed;
-        }), Codec.intRange(0, 100).fieldOf("min_radius_for_wind").forGetter((config) -> {
-            return config.minRadiusForWind;
-        }), Codec.floatRange(0.0F, 1.0F).fieldOf("min_bluntness_for_wind").forGetter((config) -> {
-            return config.minBluntnessForWind;
-        })).apply(instance, LargeDarkDripstoneFeatureConfig::new);
+public class LargeDarkDripstoneFeatureConfig implements FeatureConfiguration {
+    public static final Codec<LargeDarkDripstoneFeatureConfig> CODEC = RecordCodecBuilder.create((i) -> {
+        return i.group(Codec.intRange(1, 512).fieldOf("floor_to_ceiling_search_range").orElse(30).forGetter((c) -> {
+            return c.floorToCeilingSearchRange;
+        }), IntProviders.codec(1, 60).fieldOf("column_radius").forGetter((c) -> {
+            return c.columnRadius;
+        }), FloatProviders.codec(0.0F, 20.0F).fieldOf("height_scale").forGetter((c) -> {
+            return c.heightScale;
+        }), Codec.floatRange(0.1F, 1.0F).fieldOf("max_column_radius_to_cave_height_ratio").forGetter((c) -> {
+            return c.maxColumnRadiusToCaveHeightRatio;
+        }), FloatProviders.codec(0.1F, 10.0F).fieldOf("stalactite_bluntness").forGetter((c) -> {
+            return c.stalactiteBluntness;
+        }), FloatProviders.codec(0.1F, 10.0F).fieldOf("stalagmite_bluntness").forGetter((c) -> {
+            return c.stalagmiteBluntness;
+        }), FloatProviders.codec(0.0F, 2.0F).fieldOf("wind_speed").forGetter((c) -> {
+            return c.windSpeed;
+        }), Codec.intRange(0, 100).fieldOf("min_radius_for_wind").forGetter((c) -> {
+            return c.minRadiusForWind;
+        }), Codec.floatRange(0.0F, 5.0F).fieldOf("min_bluntness_for_wind").forGetter((c) -> {
+            return c.minBluntnessForWind;
+        })).apply(i, LargeDarkDripstoneFeatureConfig::new);
     });
     public final int floorToCeilingSearchRange;
     public final IntProvider columnRadius;

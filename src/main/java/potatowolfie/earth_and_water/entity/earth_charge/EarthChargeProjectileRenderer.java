@@ -1,47 +1,52 @@
 package potatowolfie.earth_and_water.entity.earth_charge;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import potatowolfie.earth_and_water.EarthWater;
 import potatowolfie.earth_and_water.entity.client.ModEntityModelLayers;
 
 @Environment(EnvType.CLIENT)
 public class EarthChargeProjectileRenderer extends EntityRenderer<EarthChargeProjectileEntity, EarthChargeProjectileRenderState> {
-    private static final float field_52258 = MathHelper.square(3.5F);
-    public static final Identifier TEXTURE = Identifier.of(EarthWater.MOD_ID, "textures/entity/earth_charge/earth_charge.png");
+    private static final float field_52258 = Mth.square(3.5F);
+    public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "textures/entity/earth_charge/earth_charge.png");
     protected EarthChargeProjectileModel model;
 
-    public EarthChargeProjectileRenderer(EntityRendererFactory.Context ctx) {
+    public EarthChargeProjectileRenderer(EntityRendererProvider.Context ctx) {
         super(ctx);
-        model = new EarthChargeProjectileModel(ctx.getPart(ModEntityModelLayers.EARTH_CHARGE));
+        model = new EarthChargeProjectileModel(ctx.bakeLayer(ModEntityModelLayers.EARTH_CHARGE));
     }
 
-    public void render(EarthChargeProjectileRenderState earthChargeProjectileRenderState, MatrixStack matrixStack, OrderedRenderCommandQueue orderedRenderCommandQueue, CameraRenderState cameraRenderState) {
-        if (earthChargeProjectileRenderState.age >= 2 || earthChargeProjectileRenderState.distanceFromCamera >= field_52258) {
-            matrixStack.push();
+    @Override
+    public void submit(final EarthChargeProjectileRenderState state,
+                       final PoseStack poseStack,
+                       final SubmitNodeCollector submitNodeCollector,
+                       final CameraRenderState camera) {
 
-            matrixStack.translate(0, 1.525, 0);
+        if (state.ageInTicks >= 2 || state.distanceFromCamera >= field_52258) {
 
-            matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180));
+            poseStack.pushPose();
 
-            matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(earthChargeProjectileRenderState.renderingRotation));
+            poseStack.translate(0.0, 1.525, 0.0);
+            poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
+            poseStack.mulPose(Axis.YP.rotationDegrees(state.renderingRotation));
 
-            this.model.setAngles(earthChargeProjectileRenderState);
-            orderedRenderCommandQueue.submitModelPart(
-                    this.model.getRootPart(),
-                    matrixStack,
-                    this.model.getLayer(TEXTURE),
-                    earthChargeProjectileRenderState.light,
-                    OverlayTexture.DEFAULT_UV,
+            this.model.setAngles(state);
+
+            submitNodeCollector.submitModelPart(
+                    this.model.root(),
+                    poseStack,
+                    this.model.renderType(TEXTURE),
+                    state.lightCoords,
+                    OverlayTexture.NO_OVERLAY,
                     null,
                     false,
                     false,
@@ -50,8 +55,9 @@ public class EarthChargeProjectileRenderer extends EntityRenderer<EarthChargePro
                     0
             );
 
-            matrixStack.pop();
-            super.render(earthChargeProjectileRenderState, matrixStack, orderedRenderCommandQueue, cameraRenderState);
+            poseStack.popPose();
+
+            super.submit(state, poseStack, submitNodeCollector, camera);
         }
     }
 
@@ -63,13 +69,18 @@ public class EarthChargeProjectileRenderer extends EntityRenderer<EarthChargePro
         return new EarthChargeProjectileRenderState();
     }
 
-    public void updateRenderState(EarthChargeProjectileEntity earthChargeProjectileEntity, EarthChargeProjectileRenderState earthChargeProjectileRenderState, float f) {
-        super.updateRenderState(earthChargeProjectileEntity, earthChargeProjectileRenderState, f);
-        earthChargeProjectileRenderState.renderingRotation = earthChargeProjectileEntity.getRenderingRotation();
-        earthChargeProjectileRenderState.distanceFromCamera = (float) earthChargeProjectileEntity.squaredDistanceTo(
-                earthChargeProjectileRenderState.x,
-                earthChargeProjectileRenderState.y,
-                earthChargeProjectileRenderState.z
+    @Override
+    public void extractRenderState(final EarthChargeProjectileEntity entity,
+                                   final EarthChargeProjectileRenderState state,
+                                   final float partialTicks) {
+        super.extractRenderState(entity, state, partialTicks);
+
+        state.renderingRotation = entity.getRenderingRotation();
+
+        state.distanceFromCamera = (float) entity.distanceToSqr(
+                state.x,
+                state.y,
+                state.z
         );
     }
 }

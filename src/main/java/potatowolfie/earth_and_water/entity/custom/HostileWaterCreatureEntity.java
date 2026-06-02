@@ -1,70 +1,67 @@
 package potatowolfie.earth_and_water.entity.custom;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.MovementType;
-import net.minecraft.entity.SpawnReason;
-import net.minecraft.entity.ai.control.MoveControl;
-import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.entity.ai.pathing.PathNodeType;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
-import net.minecraft.world.World;
-import net.minecraft.world.WorldAccess;
-import net.minecraft.world.WorldView;
-
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
 import java.util.EnumSet;
 
-public abstract class HostileWaterCreatureEntity extends HostileEntity {
+public abstract class HostileWaterCreatureEntity extends Monster {
 
-    protected HostileWaterCreatureEntity(EntityType<? extends HostileWaterCreatureEntity> entityType, World world) {
+    protected HostileWaterCreatureEntity(EntityType<? extends HostileWaterCreatureEntity> entityType, Level world) {
         super(entityType, world);
-        this.setPathfindingPenalty(PathNodeType.WATER, 0.0F);
+        this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.moveControl = new MoveControl(this);
     }
 
-    public boolean canSpawn(WorldView world) {
-        return world.doesNotIntersectEntities(this);
+    public boolean checkSpawnObstruction(LevelReader world) {
+        return world.isUnobstructed(this);
     }
 
-    public int getMinAmbientSoundDelay() {
+    public int getAmbientSoundInterval() {
         return 120;
     }
 
     protected int getXpToDrop() {
-        return 1 + this.getEntityWorld().random.nextInt(3);
+        return 1 + this.level().getRandom().nextInt(3);
     }
 
     @Override
-    public int getMaxAir() {
+    public int getMaxAirSupply() {
         return 300;
     }
 
     @Override
-    protected int getNextAirUnderwater(int air) {
-        return this.getMaxAir();
+    protected int decreaseAirSupply(int air) {
+        return this.getMaxAirSupply();
     }
 
     @Override
-    protected int getNextAirOnLand(int air) {
-        return this.getMaxAir();
+    protected int increaseAirSupply(int air) {
+        return this.getMaxAirSupply();
     }
 
     protected void tickWaterBreathingAir(int air) {
-        this.setAir(this.getMaxAir());
+        this.setAirSupply(this.getMaxAirSupply());
     }
 
     @Override
     public void baseTick() {
-        int i = this.getAir();
+        int i = this.getAirSupply();
         super.baseTick();
         this.tickWaterBreathingAir(i);
     }
@@ -77,12 +74,12 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         public SeekWaterGoal(HostileWaterCreatureEntity entity, double speed) {
             this.entity = entity;
             this.speed = speed;
-            this.setControls(EnumSet.of(Goal.Control.MOVE));
+            this.setFlags(EnumSet.of(Goal.Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
-            if (this.entity.isTouchingWater()) {
+        public boolean canUse() {
+            if (this.entity.isInWater()) {
                 return false;
             }
 
@@ -91,16 +88,16 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
-            return !this.entity.isTouchingWater() &&
+        public boolean canContinueToUse() {
+            return !this.entity.isInWater() &&
                     this.targetWaterPos != null &&
-                    !this.entity.getNavigation().isIdle();
+                    !this.entity.getNavigation().isDone();
         }
 
         @Override
         public void start() {
             if (this.targetWaterPos != null) {
-                this.entity.getNavigation().startMovingTo(
+                this.entity.getNavigation().moveTo(
                         this.targetWaterPos.getX(),
                         this.targetWaterPos.getY(),
                         this.targetWaterPos.getZ(),
@@ -115,15 +112,15 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         }
 
         private BlockPos findNearbyWater() {
-            BlockPos entityPos = this.entity.getBlockPos();
+            BlockPos entityPos = this.entity.blockPosition();
             int searchRange = 16;
 
             for (int range = 4; range <= searchRange; range += 4) {
                 for (int x = -range; x <= range; x += 2) {
                     for (int y = -8; y <= 8; y += 2) {
                         for (int z = -range; z <= range; z += 2) {
-                            BlockPos checkPos = entityPos.add(x, y, z);
-                            if (this.entity.getEntityWorld().getFluidState(checkPos).isIn(FluidTags.WATER)) {
+                            BlockPos checkPos = entityPos.offset(x, y, z);
+                            if (this.entity.level().getFluidState(checkPos).is(FluidTags.WATER)) {
                                 return checkPos;
                             }
                         }
@@ -146,12 +143,12 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
             this.entity = entity;
             this.speed = speed;
             this.chance = chance;
-            this.setControls(EnumSet.of(Goal.Control.MOVE));
+            this.setFlags(EnumSet.of(Goal.Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
-            if (this.entity.hasPassengers() || this.entity.getTarget() != null) {
+        public boolean canUse() {
+            if (this.entity.isVehicle() || this.entity.getTarget() != null) {
                 return false;
             }
 
@@ -159,7 +156,7 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
                 return false;
             }
 
-            return this.entity.isTouchingWater();
+            return this.entity.isInWater();
         }
 
         @Override
@@ -168,8 +165,8 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
-            return !this.entity.getNavigation().isIdle() && this.entity.isTouchingWater();
+        public boolean canContinueToUse() {
+            return !this.entity.getNavigation().isDone() && this.entity.isInWater();
         }
 
         @Override
@@ -180,13 +177,13 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         @Override
         public void tick() {
             if (this.entity.getRandom().nextInt(150) == 0 ||
-                    this.entity.squaredDistanceTo(this.targetX, this.targetY, this.targetZ) < 1.0D) {
+                    this.entity.distanceToSqr(this.targetX, this.targetY, this.targetZ) < 1.0D) {
                 this.chooseWaterTarget();
             }
         }
 
         private void chooseWaterTarget() {
-            Vec3d currentPos = this.entity.getEntityPos();
+            Vec3 currentPos = this.entity.position();
             int range = 15;
             int minDistance = 8;
 
@@ -209,11 +206,11 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
 
                 BlockPos checkPos = new BlockPos((int)potentialX, (int)potentialY, (int)potentialZ);
 
-                if (this.entity.getEntityWorld().getFluidState(checkPos).isIn(FluidTags.WATER)) {
+                if (this.entity.level().getFluidState(checkPos).is(FluidTags.WATER)) {
                     this.targetX = potentialX;
                     this.targetY = potentialY;
                     this.targetZ = potentialZ;
-                    this.entity.getNavigation().startMovingTo(this.targetX, this.targetY, this.targetZ, this.speed);
+                    this.entity.getNavigation().moveTo(this.targetX, this.targetY, this.targetZ, this.speed);
                     return;
                 }
             }
@@ -225,7 +222,7 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
     }
 
     @Override
-    public boolean isPushedByFluids() {
+    public boolean isPushedByFluid() {
         return false;
     }
 
@@ -235,18 +232,18 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
     }
 
     private boolean hasAI() {
-        return !this.isAiDisabled() && this.getEntityWorld().getDifficulty() != Difficulty.PEACEFUL;
+        return !this.isNoAi() && this.level().getDifficulty() != Difficulty.PEACEFUL;
     }
 
     @Override
-    public void travel(Vec3d movementInput) {
-        if (this.hasAI() && this.isTouchingWater()) {
-            this.updateVelocity(this.getMovementSpeed(), movementInput);
-            this.move(MovementType.SELF, this.getVelocity());
-            this.setVelocity(this.getVelocity().multiply(0.9));
+    public void travel(Vec3 movementInput) {
+        if (this.hasAI() && this.isInWater()) {
+            this.moveRelative(this.getSpeed(), movementInput);
+            this.move(MoverType.SELF, this.getDeltaMovement());
+            this.setDeltaMovement(this.getDeltaMovement().scale(0.9));
 
-            if (this.getTarget() == null && this.getNavigation().isIdle()) {
-                this.setVelocity(this.getVelocity().add(0.0, -0.005, 0.0));
+            if (this.getTarget() == null && this.getNavigation().isDone()) {
+                this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.005, 0.0));
             }
         } else {
             super.travel(movementInput);
@@ -254,30 +251,30 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
     }
 
     public boolean shouldSwim() {
-        return this.isTouchingWater() && this.getVelocity().lengthSquared() > 0.0001;
+        return this.isInWater() && this.getDeltaMovement().lengthSqr() > 0.0001;
     }
 
     public abstract boolean shouldDropXp();
 
     public boolean isFullySubmerged() {
-        double entityHeight = this.getHeight();
-        Vec3d pos = this.getEntityPos();
+        double entityHeight = this.getBbHeight();
+        Vec3 pos = this.position();
 
-        boolean bottomSubmerged = this.getEntityWorld().getFluidState(new BlockPos((int)pos.x, (int)pos.y, (int)pos.z)).isIn(FluidTags.WATER);
-        boolean middleSubmerged = this.getEntityWorld().getFluidState(new BlockPos((int)pos.x, (int)(pos.y + entityHeight * 0.5), (int)pos.z)).isIn(FluidTags.WATER);
-        boolean topSubmerged = this.getEntityWorld().getFluidState(new BlockPos((int)pos.x, (int)(pos.y + entityHeight), (int)pos.z)).isIn(FluidTags.WATER);
+        boolean bottomSubmerged = this.level().getFluidState(new BlockPos((int)pos.x, (int)pos.y, (int)pos.z)).is(FluidTags.WATER);
+        boolean middleSubmerged = this.level().getFluidState(new BlockPos((int)pos.x, (int)(pos.y + entityHeight * 0.5), (int)pos.z)).is(FluidTags.WATER);
+        boolean topSubmerged = this.level().getFluidState(new BlockPos((int)pos.x, (int)(pos.y + entityHeight), (int)pos.z)).is(FluidTags.WATER);
 
         return bottomSubmerged && middleSubmerged && topSubmerged;
     }
 
     @Override
-    public void writeCustomData(WriteView nbt) {
-        super.writeCustomData(nbt);
+    public void addAdditionalSaveData(ValueOutput nbt) {
+        super.addAdditionalSaveData(nbt);
     }
 
     @Override
-    public void readCustomData(ReadView nbt) {
-        super.readCustomData(nbt);
+    public void readAdditionalSaveData(ValueInput nbt) {
+        super.readAdditionalSaveData(nbt);
     }
 
     public static class BrineSwimGoal extends Goal {
@@ -285,16 +282,16 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
 
         public BrineSwimGoal(HostileWaterCreatureEntity entity) {
             this.entity = entity;
-            this.setControls(EnumSet.of(Goal.Control.MOVE));
+            this.setFlags(EnumSet.of(Goal.Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             return true;
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             return true;
         }
 
@@ -304,10 +301,10 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
                 return;
             }
 
-            if (this.entity.age % 80 == 0) {
+            if (this.entity.tickCount % 80 == 0) {
                 BlockPos targetPos = findRandomWaterBlock();
                 if (targetPos != null) {
-                    this.entity.getNavigation().startMovingTo(
+                    this.entity.getNavigation().moveTo(
                             targetPos.getX() + 0.5,
                             targetPos.getY() + 0.5,
                             targetPos.getZ() + 0.5,
@@ -316,10 +313,10 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
                 }
             }
 
-            if (!this.entity.isTouchingWater() && this.entity.age % 20 == 0) {
+            if (!this.entity.isInWater() && this.entity.tickCount % 20 == 0) {
                 BlockPos waterPos = findNearbyWater();
                 if (waterPos != null) {
-                    this.entity.getNavigation().startMovingTo(
+                    this.entity.getNavigation().moveTo(
                             waterPos.getX() + 0.5,
                             waterPos.getY() + 0.5,
                             waterPos.getZ() + 0.5,
@@ -330,14 +327,14 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         }
 
         private BlockPos findRandomWaterBlock() {
-            BlockPos entityPos = this.entity.getBlockPos();
+            BlockPos entityPos = this.entity.blockPosition();
 
             for (int attempt = 0; attempt < 30; attempt++) {
                 int offsetX = this.entity.getRandom().nextInt(15) - 7;
                 int offsetY = this.entity.getRandom().nextInt(15) - 7;
                 int offsetZ = this.entity.getRandom().nextInt(15) - 7;
 
-                BlockPos testPos = entityPos.add(offsetX, offsetY, offsetZ);
+                BlockPos testPos = entityPos.offset(offsetX, offsetY, offsetZ);
 
                 if (isDeepWater(testPos)) {
                     return testPos;
@@ -348,20 +345,20 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         }
 
         private boolean isDeepWater(BlockPos pos) {
-            return this.entity.getEntityWorld().getFluidState(pos).isIn(FluidTags.WATER) &&
-                    this.entity.getEntityWorld().getFluidState(pos.up()).isIn(FluidTags.WATER) &&
-                    this.entity.getEntityWorld().getFluidState(pos.up(2)).isIn(FluidTags.WATER);
+            return this.entity.level().getFluidState(pos).is(FluidTags.WATER) &&
+                    this.entity.level().getFluidState(pos.above()).is(FluidTags.WATER) &&
+                    this.entity.level().getFluidState(pos.above(2)).is(FluidTags.WATER);
         }
 
         private BlockPos findNearbyWater() {
-            BlockPos entityPos = this.entity.getBlockPos();
+            BlockPos entityPos = this.entity.blockPosition();
 
             for (int range = 4; range <= 16; range += 4) {
                 for (int x = -range; x <= range; x += 2) {
                     for (int y = -8; y <= 8; y += 2) {
                         for (int z = -range; z <= range; z += 2) {
-                            BlockPos testPos = entityPos.add(x, y, z);
-                            if (this.entity.getEntityWorld().getFluidState(testPos).isIn(FluidTags.WATER)) {
+                            BlockPos testPos = entityPos.offset(x, y, z);
+                            if (this.entity.level().getFluidState(testPos).is(FluidTags.WATER)) {
                                 return testPos;
                             }
                         }
@@ -372,15 +369,15 @@ public abstract class HostileWaterCreatureEntity extends HostileEntity {
         }
     }
 
-    public static boolean canSpawn(EntityType<? extends HostileWaterCreatureEntity> type, WorldAccess world, SpawnReason reason, BlockPos pos, Random random) {
-        return world.getFluidState(pos).isIn(FluidTags.WATER)
-                && world.getFluidState(pos.down()).isIn(FluidTags.WATER)
-                && world.getFluidState(pos.up()).isIn(FluidTags.WATER)
+    public static boolean canSpawn(EntityType<? extends HostileWaterCreatureEntity> type, LevelAccessor world, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
+        return world.getFluidState(pos).is(FluidTags.WATER)
+                && world.getFluidState(pos.below()).is(FluidTags.WATER)
+                && world.getFluidState(pos.above()).is(FluidTags.WATER)
                 && world.getDifficulty() != Difficulty.PEACEFUL;
     }
 
     @Override
-    public boolean canWalkOnFluid(FluidState state) {
+    public boolean canStandOnFluid(FluidState state) {
         return false;
     }
 

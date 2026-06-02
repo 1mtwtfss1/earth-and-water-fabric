@@ -1,6 +1,6 @@
 package potatowolfie.earth_and_water.item;
 
-import net.minecraft.item.ToolMaterial;
+import net.minecraft.world.item.ToolMaterial;
 import potatowolfie.earth_and_water.util.ModTags;
 
 public class ModToolMaterials {

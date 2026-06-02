@@ -1,34 +1,45 @@
 package potatowolfie.earth_and_water.entity.bore;
 
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.entity.*;
-import net.minecraft.entity.ai.goal.*;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.damage.DamageTypes;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.passive.IronGolemEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.BlockStateParticleEffect;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.LocalDifficulty;
-import net.minecraft.world.ServerWorldAccess;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
+import net.minecraft.world.entity.AnimationState;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import potatowolfie.earth_and_water.entity.earth_charge.EarthChargeProjectileEntity;
 import potatowolfie.earth_and_water.sound.ModSounds;
@@ -37,7 +48,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 
-public class BoreEntity extends HostileEntity {
+public class BoreEntity extends Monster {
 
     public final AnimationState idleAnimationState = new AnimationState();
     public final AnimationState shootingAnimationState = new AnimationState();
@@ -65,11 +76,11 @@ public class BoreEntity extends HostileEntity {
     private boolean isInCombat = false;
     private int combatStartTime = 0;
     private LivingEntity lastTarget = null;
-    private Vec3d circlingCenter = null;
+    private Vec3 circlingCenter = null;
     private double circlingAngle = 0;
     private int circlingDirection = 1;
 
-    private Vec3d stuckCheckPosition = null;
+    private Vec3 stuckCheckPosition = null;
     private int stuckTimer = 0;
     private static final int STUCK_TIME_THRESHOLD = 60;
     private static final double STUCK_AREA_SIZE = 2.5;
@@ -119,8 +130,8 @@ public class BoreEntity extends HostileEntity {
         }
     }
 
-    private static final TrackedData<Integer> DATA_ID_TYPE_VARIANT =
-            DataTracker.registerData(BoreEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    private static final EntityDataAccessor<Integer> DATA_ID_TYPE_VARIANT =
+            SynchedEntityData.defineId(BoreEntity.class, EntityDataSerializers.INT);
 
     private BoreState boreState = BoreState.IDLE;
     private BoreState previousState = BoreState.IDLE;
@@ -128,44 +139,44 @@ public class BoreEntity extends HostileEntity {
     private int stateTimer = 0;
     private int shootCooldown = 0;
     private BlockPos relocateTarget = null;
-    private Vec3d lastShootPosition = null;
+    private Vec3 lastShootPosition = null;
     private boolean hasMovedEnoughToShoot = true;
 
-    public BoreEntity(EntityType<? extends HostileEntity> entityType, World world) {
+    public BoreEntity(EntityType<? extends Monster> entityType, Level world) {
         super(entityType, world);
-        this.experiencePoints = 8;
+        this.xpReward = 8;
     }
 
-    public static DefaultAttributeContainer.Builder createBoreAttributes() {
-        return MobEntity.createMobAttributes()
-                .add(EntityAttributes.MAX_HEALTH, 30.0)
-                .add(EntityAttributes.MOVEMENT_SPEED, 0.23)
-                .add(EntityAttributes.ATTACK_DAMAGE, 8.0)
-                .add(EntityAttributes.FOLLOW_RANGE, 32.0)
-                .add(EntityAttributes.JUMP_STRENGTH, 0.42);
+    public static AttributeSupplier.Builder createBoreAttributes() {
+        return Mob.createMobAttributes()
+                .add(Attributes.MAX_HEALTH, 30.0)
+                .add(Attributes.MOVEMENT_SPEED, 0.23)
+                .add(Attributes.ATTACK_DAMAGE, 8.0)
+                .add(Attributes.FOLLOW_RANGE, 32.0)
+                .add(Attributes.JUMP_STRENGTH, 0.42);
     }
 
     @Override
-    protected void initGoals() {
-        this.goalSelector.add(0, new BoreAvoidProjectileGoal(this));
-        this.goalSelector.add(1, new BoreBurrowingMovementGoal(this));
-        this.goalSelector.add(2, new BoreShootGoal(this));
-        this.goalSelector.add(3, new BoreCircleGoal(this));
-        this.goalSelector.add(4, new BoreRelocateGoal(this));
-        this.goalSelector.add(5, new BoreFleeGoal(this));
-        this.goalSelector.add(6, new BoreSmartPositioningGoal(this));
-        this.goalSelector.add(7, new WanderAroundFarGoal(this, 1.0));
-        this.goalSelector.add(8, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(9, new LookAroundGoal(this));
+    protected void registerGoals() {
+        this.goalSelector.addGoal(0, new BoreAvoidProjectileGoal(this));
+        this.goalSelector.addGoal(1, new BoreBurrowingMovementGoal(this));
+        this.goalSelector.addGoal(2, new BoreShootGoal(this));
+        this.goalSelector.addGoal(3, new BoreCircleGoal(this));
+        this.goalSelector.addGoal(4, new BoreRelocateGoal(this));
+        this.goalSelector.addGoal(5, new BoreFleeGoal(this));
+        this.goalSelector.addGoal(6, new BoreSmartPositioningGoal(this));
+        this.goalSelector.addGoal(7, new WaterAvoidingRandomStrollGoal(this, 1.0));
+        this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
 
-        this.targetSelector.add(1, new ActiveTargetGoal<>(this, PlayerEntity.class, true));
-        this.targetSelector.add(2, new ActiveTargetGoal<>(this, IronGolemEntity.class, true));
-        this.targetSelector.add(3, new RevengeGoal(this, BoreEntity.class));
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, true));
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, IronGolem.class, true));
+        this.targetSelector.addGoal(3, new HurtByTargetGoal(this, BoreEntity.class));
     }
 
     @Override
     public void tick() {
-        if (this.isRemoved() || this.getEntityWorld() == null) {
+        if (this.isRemoved() || this.level() == null) {
             return;
         }
 
@@ -194,7 +205,7 @@ public class BoreEntity extends HostileEntity {
             handleStateTransitions();
             updateAnimations();
 
-            if (this.getEntityWorld().isClient()) {
+            if (this.level().isClientSide()) {
                 switch (this.getBoreState()) {
                     case BURROWING -> {
                         if (this.stateTimer < 20) {
@@ -228,10 +239,10 @@ public class BoreEntity extends HostileEntity {
     }
 
     @Override
-    protected void initDataTracker(DataTracker.Builder builder) {
-        super.initDataTracker(builder);
-        builder.add(DATA_ID_TYPE_VARIANT, 0);
-        builder.add(DATA_ID_STATE, BoreState.IDLE.ordinal());
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(DATA_ID_TYPE_VARIANT, 0);
+        builder.define(DATA_ID_STATE, BoreState.IDLE.ordinal());
     }
 
     private void updateCombatState() {
@@ -240,9 +251,9 @@ public class BoreEntity extends HostileEntity {
 
         if (target != null && target.isAlive() && !target.isRemoved() && target != lastTarget) {
             isInCombat = true;
-            combatStartTime = this.age;
+            combatStartTime = this.tickCount;
             lastTarget = target;
-            circlingCenter = target.getEntityPos();
+            circlingCenter = target.position();
             circlingAngle = this.random.nextDouble() * Math.PI * 2;
             circlingDirection = this.random.nextBoolean() ? 1 : -1;
 
@@ -256,7 +267,7 @@ public class BoreEntity extends HostileEntity {
         }
 
         if (isInCombat && target != null && target.isAlive() && !target.isRemoved()) {
-            circlingCenter = target.getEntityPos();
+            circlingCenter = target.position();
 
             handleCombatBurrowing();
         }
@@ -269,7 +280,7 @@ public class BoreEntity extends HostileEntity {
             return false;
         }
 
-        Vec3d currentPos = this.getEntityPos();
+        Vec3 currentPos = this.position();
 
         if (stuckCheckPosition == null) {
             stuckCheckPosition = currentPos;
@@ -298,9 +309,9 @@ public class BoreEntity extends HostileEntity {
         if (target != null && target.isAlive() && !target.isRemoved()) {
             double distanceToTarget = this.distanceTo(target);
 
-            List<BoreEntity> nearbyBurrowers = this.getEntityWorld().getEntitiesByClass(
+            List<BoreEntity> nearbyBurrowers = this.level().getEntitiesOfClass(
                     BoreEntity.class,
-                    this.getBoundingBox().expand(16.0),
+                    this.getBoundingBox().inflate(16.0),
                     bore -> bore != this && bore.getBoreState() == BoreState.BURROWING
             );
 
@@ -317,22 +328,22 @@ public class BoreEntity extends HostileEntity {
                 burrowCooldown = 200 + this.random.nextInt(100);
 
                 for (BoreEntity bore : nearbyBurrowers) {
-                    Vec3d away = bore.getEntityPos().subtract(target.getEntityPos()).normalize();
-                    Vec3d retreatPos = bore.getEntityPos().add(away.multiply(6.0));
-                    bore.getNavigation().startMovingTo(retreatPos.x, retreatPos.y, retreatPos.z, 1.3);
+                    Vec3 away = bore.position().subtract(target.position()).normalize();
+                    Vec3 retreatPos = bore.position().add(away.scale(6.0));
+                    bore.getNavigation().moveTo(retreatPos.x, retreatPos.y, retreatPos.z, 1.3);
                 }
             }
         }
     }
 
     private void updateAnimations() {
-        if (this.getEntityWorld().isClient()) {
+        if (this.level().isClientSide()) {
             if (this.boreState == BoreState.IDLE) {
                 if (!isIdleAnimationRunning) {
                     --this.idleAnimationTimeout;
                     if (this.idleAnimationTimeout <= 0) {
                         this.idleAnimationTimeout = this.random.nextInt(40) + 80;
-                        this.idleAnimationState.start(this.age);
+                        this.idleAnimationState.start(this.tickCount);
                         this.isIdleAnimationRunning = true;
                     }
                 }
@@ -346,7 +357,7 @@ public class BoreEntity extends HostileEntity {
 
     private void updateMovementTracking() {
         if (lastShootPosition != null) {
-            Vec3d currentPos = this.getEntityPos();
+            Vec3 currentPos = this.position();
             if (currentPos != null) {
                 double distanceMoved = currentPos.distanceTo(lastShootPosition);
 
@@ -361,7 +372,7 @@ public class BoreEntity extends HostileEntity {
         double baseSpeed = 0.23;
 
         if (isInCombat && this.getTarget() != null) {
-            int timeSinceCombatStart = this.age - combatStartTime;
+            int timeSinceCombatStart = this.tickCount - combatStartTime;
             double progressionFactor = Math.min(timeSinceCombatStart / 120.0, 1.0);
 
             progressionFactor = easeInOutQuad(progressionFactor);
@@ -374,19 +385,19 @@ public class BoreEntity extends HostileEntity {
             case BURROWING:
                 if (isWalkingWhileBurrowed) {
                     if (isInCombat && this.getTarget() != null) {
-                        Objects.requireNonNull(this.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED)).setBaseValue(0.35);
+                        Objects.requireNonNull(this.getAttribute(Attributes.MOVEMENT_SPEED)).setBaseValue(0.35);
                     } else {
-                        Objects.requireNonNull(this.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED)).setBaseValue(0.6);
+                        Objects.requireNonNull(this.getAttribute(Attributes.MOVEMENT_SPEED)).setBaseValue(0.6);
                     }
                 } else {
-                    Objects.requireNonNull(this.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED)).setBaseValue(baseSpeed * 0.1);
+                    Objects.requireNonNull(this.getAttribute(Attributes.MOVEMENT_SPEED)).setBaseValue(baseSpeed * 0.1);
                 }
                 break;
             case UNBURROWING:
-                Objects.requireNonNull(this.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED)).setBaseValue(baseSpeed * 0.1);
+                Objects.requireNonNull(this.getAttribute(Attributes.MOVEMENT_SPEED)).setBaseValue(baseSpeed * 0.1);
                 break;
             default:
-                Objects.requireNonNull(this.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED)).setBaseValue(baseSpeed);
+                Objects.requireNonNull(this.getAttribute(Attributes.MOVEMENT_SPEED)).setBaseValue(baseSpeed);
                 break;
         }
     }
@@ -396,36 +407,36 @@ public class BoreEntity extends HostileEntity {
     }
 
     @Override
-    public boolean damage(ServerWorld world, DamageSource damageSource, float amount) {
-        if (damageSource.isOf(DamageTypes.FALL) && boreState == BoreState.BURROWING) {
+    public boolean hurtServer(ServerLevel world, DamageSource damageSource, float amount) {
+        if (damageSource.is(DamageTypes.FALL) && boreState == BoreState.BURROWING) {
             return false;
         }
 
         if (this.getBoreState() == BoreState.BURROWING) {
-            if (damageSource.isOf(DamageTypes.OUT_OF_WORLD) ||
-                    damageSource.isOf(DamageTypes.GENERIC_KILL)) {
-                return super.damage(world, damageSource, amount);
+            if (damageSource.is(DamageTypes.FELL_OUT_OF_WORLD) ||
+                    damageSource.is(DamageTypes.GENERIC_KILL)) {
+                return super.hurtServer(world, damageSource, amount);
             }
 
-            Entity attacker = damageSource.getAttacker();
+            Entity attacker = damageSource.getEntity();
             if (attacker instanceof LivingEntity living) {
-                ItemStack weapon = living.getMainHandStack();
+                ItemStack weapon = living.getMainHandItem();
                 if (weapon.getItem().toString().contains("pickaxe")) {
                     this.forceUnburrow();
                     this.burrowCooldownTimer = 80;
-                    return super.damage(world, damageSource, amount);
+                    return super.hurtServer(world, damageSource, amount);
                 }
             }
             return false;
         }
-        return super.damage(world, damageSource, amount);
+        return super.hurtServer(world, damageSource, amount);
     }
 
 
     private void handleStateTransitions() {
         switch (boreState) {
             case SHOOTING:
-                if (stateTimer == 20 && !this.getEntityWorld().isClient()) {
+                if (stateTimer == 20 && !this.level().isClientSide()) {
                     fireEarthCharge();
                 }
                 if (stateTimer >= 40) {
@@ -439,11 +450,11 @@ public class BoreEntity extends HostileEntity {
                         setBurrowDestination();
                         isWalkingWhileBurrowed = true;
 
-                        if (this.getEntityWorld().isClient() && burrowDestination != null && !whileburrowAnimPlayed) {
+                        if (this.level().isClientSide() && burrowDestination != null && !whileburrowAnimPlayed) {
                             burrowingAnimationState.stop();
-                            whileburrowingAnimationState.start(this.age);
+                            whileburrowingAnimationState.start(this.tickCount);
                             whileburrowAnimPlayed = true;
-                        } else if (this.getEntityWorld().isClient() && burrowDestination == null) {
+                        } else if (this.level().isClientSide() && burrowDestination == null) {
                             forceUnburrow();
                             return;
                         }
@@ -451,8 +462,8 @@ public class BoreEntity extends HostileEntity {
                 }
 
                 if (isWalkingWhileBurrowed && burrowDestination != null) {
-                    if (this.getNavigation().isIdle()) {
-                        this.getNavigation().startMovingTo(
+                    if (this.getNavigation().isDone()) {
+                        this.getNavigation().moveTo(
                                 burrowDestination.getX(),
                                 this.getY(),
                                 burrowDestination.getZ(),
@@ -460,7 +471,7 @@ public class BoreEntity extends HostileEntity {
                         );
                     }
 
-                    double distanceToDestination = Math.sqrt(this.squaredDistanceTo(
+                    double distanceToDestination = Math.sqrt(this.distanceToSqr(
                             burrowDestination.getX(), burrowDestination.getY(), burrowDestination.getZ()));
 
                     if (distanceToDestination < 1.5 || stateTimer >= 300) {
@@ -482,7 +493,7 @@ public class BoreEntity extends HostileEntity {
     }
 
     private void forceUnburrow() {
-        if (this.getEntityWorld().isClient()) {
+        if (this.level().isClientSide()) {
             whileburrowingAnimationState.stop();
             burrowingAnimationState.stop();
         }
@@ -501,10 +512,10 @@ public class BoreEntity extends HostileEntity {
         }
 
         double currentY = this.getY();
-        Vec3d targetPos = target.getEntityPos();
-        Vec3d currentPos = this.getEntityPos();
+        Vec3 targetPos = target.position();
+        Vec3 currentPos = this.position();
 
-        Vec3d awayDirection = currentPos.subtract(targetPos).normalize();
+        Vec3 awayDirection = currentPos.subtract(targetPos).normalize();
 
         BlockPos bestDestination = null;
         double bestScore = Double.MAX_VALUE;
@@ -535,7 +546,7 @@ public class BoreEntity extends HostileEntity {
                     double distanceFromTarget = Math.sqrt(Math.pow(targetX - targetPos.x, 2) + Math.pow(targetZ - targetPos.z, 2));
                     double score = Math.abs(groundY - currentY) + (distance * 0.1) - (distanceFromTarget * 0.2);
 
-                    if (!isPathBlocked(new Vec3d(targetPosBlock.getX(), targetPosBlock.getY(), targetPosBlock.getZ()))) {
+                    if (!isPathBlocked(new Vec3(targetPosBlock.getX(), targetPosBlock.getY(), targetPosBlock.getZ()))) {
                         score -= 5.0;
                     }
 
@@ -602,7 +613,7 @@ public class BoreEntity extends HostileEntity {
                 if (isPositionSafeForBurrowing(targetPos)) {
                     double score = Math.abs(groundY - currentY) + (distance * 0.1);
 
-                    if (!isPathBlocked(new Vec3d(targetPos.getX(), targetPos.getY(), targetPos.getZ()))) {
+                    if (!isPathBlocked(new Vec3(targetPos.getX(), targetPos.getY(), targetPos.getZ()))) {
                         score -= 5.0;
                     }
 
@@ -641,25 +652,25 @@ public class BoreEntity extends HostileEntity {
     }
 
     private boolean isPositionSafeForBurrowing(BlockPos pos) {
-        if (this.getEntityWorld() == null || pos == null) return false;
+        if (this.level() == null || pos == null) return false;
 
-        if (this.getEntityWorld().getBlockState(pos).getBlock().toString().contains("lava") ||
-                this.getEntityWorld().getBlockState(pos).getBlock().toString().contains("water")) {
+        if (this.level().getBlockState(pos).getBlock().toString().contains("lava") ||
+                this.level().getBlockState(pos).getBlock().toString().contains("water")) {
             return false;
         }
 
-        int topY = this.getEntityWorld().getBottomY() + this.getEntityWorld().getHeight() - 1;
-        if (pos.getY() <= this.getEntityWorld().getBottomY() || pos.getY() >= topY - 2) {
+        int topY = this.level().getMinY() + this.level().getHeight() - 1;
+        if (pos.getY() <= this.level().getMinY() || pos.getY() >= topY - 2) {
             return false;
         }
 
-        BlockPos belowPos = pos.down();
-        if (!this.getEntityWorld().getBlockState(belowPos).isSolidBlock(this.getEntityWorld(), belowPos)) {
+        BlockPos belowPos = pos.below();
+        if (!this.level().getBlockState(belowPos).isRedstoneConductor(this.level(), belowPos)) {
             return false;
         }
 
-        if (this.getEntityWorld().getBlockState(pos).isSolidBlock(this.getEntityWorld(), pos) ||
-                this.getEntityWorld().getBlockState(pos.up()).isSolidBlock(this.getEntityWorld(), pos.up())) {
+        if (this.level().getBlockState(pos).isRedstoneConductor(this.level(), pos) ||
+                this.level().getBlockState(pos.above()).isRedstoneConductor(this.level(), pos.above())) {
             return false;
         }
 
@@ -669,16 +680,16 @@ public class BoreEntity extends HostileEntity {
     private static class BoreBurrowingMovementGoal extends Goal {
         private final BoreEntity bore;
         private int stuckCounter = 0;
-        private Vec3d lastPosition = null;
+        private Vec3 lastPosition = null;
         private int forceMovementTimer = 0;
 
         public BoreBurrowingMovementGoal(BoreEntity bore) {
             this.bore = bore;
-            this.setControls(EnumSet.of(Control.MOVE));
+            this.setFlags(EnumSet.of(Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             return bore.getBoreState() == BoreState.BURROWING &&
                     bore.isWalkingWhileBurrowed &&
                     bore.burrowDestination != null;
@@ -688,7 +699,7 @@ public class BoreEntity extends HostileEntity {
         public void start() {
             stuckCounter = 0;
             forceMovementTimer = 0;
-            lastPosition = bore.getEntityPos();
+            lastPosition = bore.position();
         }
 
         @Override
@@ -697,7 +708,7 @@ public class BoreEntity extends HostileEntity {
                 double currentY = bore.getY();
                 double moveSpeed = (bore.isInCombat() && bore.getTarget() != null) ? 1.2 : 1.4;
 
-                Vec3d currentPos = bore.getEntityPos();
+                Vec3 currentPos = bore.position();
 
                 if (lastPosition != null && currentPos.distanceTo(lastPosition) < 0.1) {
                     stuckCounter++;
@@ -713,7 +724,7 @@ public class BoreEntity extends HostileEntity {
 
                             bore.burrowDestination = alternative;
                             bore.getNavigation().stop();
-                            bore.getNavigation().startMovingTo(
+                            bore.getNavigation().moveTo(
                                     alternative.getX(), currentY, alternative.getZ(), moveSpeed
                             );
                             stuckCounter = 0;
@@ -722,12 +733,12 @@ public class BoreEntity extends HostileEntity {
                     }
 
                     if (forceMovementTimer > 5 && bore.burrowDestination != null) {
-                        Vec3d direction = new Vec3d(
+                        Vec3 direction = new Vec3(
                                 bore.burrowDestination.getX(), currentY, bore.burrowDestination.getZ()
                         ).subtract(currentPos).normalize();
 
-                        Vec3d forceMovement = direction.multiply(0.15);
-                        bore.setVelocity(bore.getVelocity().add(forceMovement));
+                        Vec3 forceMovement = direction.scale(0.15);
+                        bore.setDeltaMovement(bore.getDeltaMovement().add(forceMovement));
                         forceMovementTimer = 0;
                     }
                 } else {
@@ -737,13 +748,13 @@ public class BoreEntity extends HostileEntity {
 
                 lastPosition = currentPos;
 
-                if (bore.getNavigation().isIdle()) {
+                if (bore.getNavigation().isDone()) {
                     if (bore.burrowDestination.getY() < bore.getBlockY()) {
                         bore.forceUnburrow();
                         return;
                     }
 
-                    bore.getNavigation().startMovingTo(
+                    bore.getNavigation().moveTo(
                             bore.burrowDestination.getX(),
                             currentY,
                             bore.burrowDestination.getZ(),
@@ -754,7 +765,7 @@ public class BoreEntity extends HostileEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             return bore.getBoreState() == BoreState.BURROWING &&
                     bore.isWalkingWhileBurrowed &&
                     bore.burrowDestination != null;
@@ -762,21 +773,21 @@ public class BoreEntity extends HostileEntity {
     }
 
     private boolean isNavigationStuck() {
-        return this.getNavigation().isIdle() &&
+        return this.getNavigation().isDone() &&
                 boreState == BoreState.BURROWING &&
                 isWalkingWhileBurrowed &&
                 burrowDestination != null;
     }
 
-    private boolean wouldFallOffEdge(Vec3d targetPos) {
-        if (this.getEntityWorld() == null || targetPos == null) return true;
+    private boolean wouldFallOffEdge(Vec3 targetPos) {
+        if (this.level() == null || targetPos == null) return true;
 
         BlockPos blockPos = new BlockPos((int)targetPos.x, (int)targetPos.y, (int)targetPos.z);
-        BlockPos belowPos = blockPos.down();
+        BlockPos belowPos = blockPos.below();
 
         for (int i = 1; i <= 3; i++) {
-            BlockPos checkPos = belowPos.down(i);
-            if (this.getEntityWorld().getBlockState(checkPos).isSolidBlock(this.getEntityWorld(), checkPos)) {
+            BlockPos checkPos = belowPos.below(i);
+            if (this.level().getBlockState(checkPos).isRedstoneConductor(this.level(), checkPos)) {
                 return false;
             }
         }
@@ -802,13 +813,13 @@ public class BoreEntity extends HostileEntity {
     }
 
     private boolean isPositionSafe(BlockPos pos) {
-        if (this.getEntityWorld() == null || pos == null) return false;
-        return this.getEntityWorld().isAir(pos) &&
-                this.getEntityWorld().isAir(pos.up()) &&
-                this.getEntityWorld().getBlockState(pos.down()).isSolidBlock(this.getEntityWorld(), pos.down());
+        if (this.level() == null || pos == null) return false;
+        return this.level().isEmptyBlock(pos) &&
+                this.level().isEmptyBlock(pos.above()) &&
+                this.level().getBlockState(pos.below()).isRedstoneConductor(this.level(), pos.below());
     }
 
-    public Vec3d getCirclingPosition() {
+    public Vec3 getCirclingPosition() {
         if (circlingCenter == null) return null;
 
         double radius = 8.0;
@@ -820,7 +831,7 @@ public class BoreEntity extends HostileEntity {
 
         if (!isPositionSafe(testPos)) {
             for (int yOffset = -2; yOffset <= 3; yOffset++) {
-                BlockPos adjustedPos = testPos.add(0, yOffset, 0);
+                BlockPos adjustedPos = testPos.offset(0, yOffset, 0);
                 if (isPositionSafe(adjustedPos)) {
                     y = adjustedPos.getY();
                     break;
@@ -828,24 +839,24 @@ public class BoreEntity extends HostileEntity {
             }
         }
 
-        return new Vec3d(x, y, z);
+        return new Vec3(x, y, z);
     }
 
     @Override
-    public void travel(Vec3d movementInput) {
+    public void travel(Vec3 movementInput) {
         if (getBoreState() == BoreState.BURROWING && isWalkingWhileBurrowed) {
-            Vec3d currentPos = this.getEntityPos();
-            Vec3d targetPos = currentPos.add(movementInput);
+            Vec3 currentPos = this.position();
+            Vec3 targetPos = currentPos.add(movementInput);
 
-            BlockPos currentBlock = BlockPos.ofFloored(currentPos);
-            BlockPos targetBlock = BlockPos.ofFloored(targetPos);
+            BlockPos currentBlock = BlockPos.containing(currentPos);
+            BlockPos targetBlock = BlockPos.containing(targetPos);
 
             if (targetBlock.getY() < currentBlock.getY()) {
-                this.setVelocity(0, 0, 0);
+                this.setDeltaMovement(0, 0, 0);
                 return;
             }
 
-            Vec3d flatMovement = new Vec3d(movementInput.x, 0, movementInput.z);
+            Vec3 flatMovement = new Vec3(movementInput.x, 0, movementInput.z);
             super.travel(flatMovement);
             return;
         }
@@ -854,24 +865,24 @@ public class BoreEntity extends HostileEntity {
     }
 
     private double findGroundLevel(double x, double z) {
-        if (this.getEntityWorld() == null) return -1;
+        if (this.level() == null) return -1;
 
         int blockX = (int) Math.floor(x);
         int blockZ = (int) Math.floor(z);
         int startY = (int) this.getY();
-        int topY = this.getEntityWorld().getBottomY() + this.getEntityWorld().getHeight() - 1;
+        int topY = this.level().getMinY() + this.level().getHeight() - 1;
 
-        for (int y = startY; y >= this.getEntityWorld().getBottomY(); y--) {
+        for (int y = startY; y >= this.level().getMinY(); y--) {
             BlockPos checkPos = new BlockPos(blockX, y, blockZ);
-            BlockPos abovePos = checkPos.up();
+            BlockPos abovePos = checkPos.above();
 
-            if (this.getEntityWorld().getBlockState(checkPos).isSolidBlock(this.getEntityWorld(), checkPos) &&
-                    (!this.getEntityWorld().getBlockState(abovePos).isSolidBlock(this.getEntityWorld(), abovePos) ||
-                            this.getEntityWorld().isAir(abovePos))) {
+            if (this.level().getBlockState(checkPos).isRedstoneConductor(this.level(), checkPos) &&
+                    (!this.level().getBlockState(abovePos).isRedstoneConductor(this.level(), abovePos) ||
+                            this.level().isEmptyBlock(abovePos))) {
 
-                BlockPos aboveAbove = abovePos.up();
-                if (!this.getEntityWorld().getBlockState(aboveAbove).isSolidBlock(this.getEntityWorld(), aboveAbove) ||
-                        this.getEntityWorld().isAir(aboveAbove)) {
+                BlockPos aboveAbove = abovePos.above();
+                if (!this.level().getBlockState(aboveAbove).isRedstoneConductor(this.level(), aboveAbove) ||
+                        this.level().isEmptyBlock(aboveAbove)) {
                     return y + 1.0;
                 }
             }
@@ -879,15 +890,15 @@ public class BoreEntity extends HostileEntity {
 
         for (int y = startY + 1; y <= topY - 2; y++) {
             BlockPos checkPos = new BlockPos(blockX, y, blockZ);
-            BlockPos abovePos = checkPos.up();
+            BlockPos abovePos = checkPos.above();
 
-            if (this.getEntityWorld().getBlockState(checkPos).isSolidBlock(this.getEntityWorld(), checkPos) &&
-                    (!this.getEntityWorld().getBlockState(abovePos).isSolidBlock(this.getEntityWorld(), abovePos) ||
-                            this.getEntityWorld().isAir(abovePos))) {
+            if (this.level().getBlockState(checkPos).isRedstoneConductor(this.level(), checkPos) &&
+                    (!this.level().getBlockState(abovePos).isRedstoneConductor(this.level(), abovePos) ||
+                            this.level().isEmptyBlock(abovePos))) {
 
-                BlockPos aboveAbove = abovePos.up();
-                if (!this.getEntityWorld().getBlockState(aboveAbove).isSolidBlock(this.getEntityWorld(), aboveAbove) ||
-                        this.getEntityWorld().isAir(aboveAbove)) {
+                BlockPos aboveAbove = abovePos.above();
+                if (!this.level().getBlockState(aboveAbove).isRedstoneConductor(this.level(), aboveAbove) ||
+                        this.level().isEmptyBlock(aboveAbove)) {
                     return y + 1.0;
                 }
             }
@@ -897,16 +908,16 @@ public class BoreEntity extends HostileEntity {
     }
 
     @Override
-    protected float getJumpVelocity() {
+    protected float getJumpPower() {
         if (boreState == BoreState.BURROWING) {
             return 0.0f;
         }
-        return super.getJumpVelocity();
+        return super.getJumpPower();
     }
 
     @Override
-    public boolean isClimbing() {
-        return super.isClimbing() && boreState != BoreState.BURROWING;
+    public boolean onClimbable() {
+        return super.onClimbable() && boreState != BoreState.BURROWING;
     }
 
     public void updateCirclingAngle() {
@@ -922,16 +933,16 @@ public class BoreEntity extends HostileEntity {
     }
 
     public int getCombatDuration() {
-        return isInCombat ? this.age - combatStartTime : 0;
+        return isInCombat ? this.tickCount - combatStartTime : 0;
     }
 
     private boolean isNearbyProjectileDangerous() {
-        if (this.getEntityWorld() == null) return false;
+        if (this.level() == null) return false;
 
         try {
-            List<EarthChargeProjectileEntity> projectiles = this.getEntityWorld().getEntitiesByClass(
+            List<EarthChargeProjectileEntity> projectiles = this.level().getEntitiesOfClass(
                     EarthChargeProjectileEntity.class,
-                    this.getBoundingBox().expand(PROJECTILE_DANGER_RADIUS),
+                    this.getBoundingBox().inflate(PROJECTILE_DANGER_RADIUS),
                     projectile -> projectile != null && projectile.getOwner() != this
             );
 
@@ -942,12 +953,12 @@ public class BoreEntity extends HostileEntity {
     }
 
     private boolean isNearFriendlyProjectile() {
-        if (this.getEntityWorld() == null) return false;
+        if (this.level() == null) return false;
 
         try {
-            List<EarthChargeProjectileEntity> friendlyProjectiles = this.getEntityWorld().getEntitiesByClass(
+            List<EarthChargeProjectileEntity> friendlyProjectiles = this.level().getEntitiesOfClass(
                     EarthChargeProjectileEntity.class,
-                    this.getBoundingBox().expand(FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS),
+                    this.getBoundingBox().inflate(FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS),
                     projectile -> projectile != null && projectile.getOwner() instanceof BoreEntity && projectile.getOwner() != this
             );
 
@@ -957,24 +968,24 @@ public class BoreEntity extends HostileEntity {
         }
     }
 
-    private Vec3d getProjectileAvoidanceDirection() {
-        if (this.getEntityWorld() == null) return null;
+    private Vec3 getProjectileAvoidanceDirection() {
+        if (this.level() == null) return null;
 
         try {
-            List<EarthChargeProjectileEntity> projectiles = this.getEntityWorld().getEntitiesByClass(
+            List<EarthChargeProjectileEntity> projectiles = this.level().getEntitiesOfClass(
                     EarthChargeProjectileEntity.class,
-                    this.getBoundingBox().expand(Math.max(PROJECTILE_DANGER_RADIUS, FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS)),
+                    this.getBoundingBox().inflate(Math.max(PROJECTILE_DANGER_RADIUS, FRIENDLY_PROJECTILE_AVOIDANCE_RADIUS)),
                     projectile -> projectile != null && projectile.getOwner() != this
             );
 
             if (projectiles.isEmpty()) return null;
 
-            Vec3d avoidanceDirection = Vec3d.ZERO;
+            Vec3 avoidanceDirection = Vec3.ZERO;
             for (EarthChargeProjectileEntity projectile : projectiles) {
-                if (projectile != null && projectile.getEntityPos() != null) {
-                    Vec3d directionAway = this.getEntityPos().subtract(projectile.getEntityPos()).normalize();
+                if (projectile != null && projectile.position() != null) {
+                    Vec3 directionAway = this.position().subtract(projectile.position()).normalize();
                     double weight = (projectile.getOwner() instanceof BoreEntity) ? 1.5 : 1.0;
-                    avoidanceDirection = avoidanceDirection.add(directionAway.multiply(weight));
+                    avoidanceDirection = avoidanceDirection.add(directionAway.scale(weight));
                 }
             }
 
@@ -985,12 +996,12 @@ public class BoreEntity extends HostileEntity {
     }
 
     private int countNearbyShootingAllies() {
-        if (this.getEntityWorld() == null) return 0;
+        if (this.level() == null) return 0;
 
         try {
-            List<BoreEntity> nearbyAllies = this.getEntityWorld().getEntitiesByClass(
+            List<BoreEntity> nearbyAllies = this.level().getEntitiesOfClass(
                     BoreEntity.class,
-                    this.getBoundingBox().expand(16.0),
+                    this.getBoundingBox().inflate(16.0),
                     bore -> bore != null && bore != this && bore.isAlive() && !bore.isRemoved()
             );
 
@@ -1047,8 +1058,8 @@ public class BoreEntity extends HostileEntity {
             this.animationTick = 0;
             this.stateTimer = 0;
 
-            if (!this.getEntityWorld().isClient()) {
-                this.dataTracker.set(DATA_ID_STATE, newState.ordinal());
+            if (!this.level().isClientSide()) {
+                this.entityData.set(DATA_ID_STATE, newState.ordinal());
             } else {
                 startStateAnimation(newState);
             }
@@ -1063,7 +1074,7 @@ public class BoreEntity extends HostileEntity {
     }
 
     private void startStateAnimation(BoreState state) {
-        if (!this.getEntityWorld().isClient() || animationStartedThisTick) return;
+        if (!this.level().isClientSide() || animationStartedThisTick) return;
 
         animationStartedThisTick = true;
 
@@ -1083,12 +1094,12 @@ public class BoreEntity extends HostileEntity {
                 }
 
                 this.idleAnimationTimeout = this.random.nextInt(40) + 80;
-                this.idleAnimationState.start(this.age);
+                this.idleAnimationState.start(this.tickCount);
                 this.isIdleAnimationRunning = true;
             }
             case SHOOTING -> {
                 stopAllAnimations();
-                this.shootingAnimationState.start(this.age);
+                this.shootingAnimationState.start(this.tickCount);
                 this.isIdleAnimationRunning = false;
             }
             case BURROWING -> {
@@ -1097,7 +1108,7 @@ public class BoreEntity extends HostileEntity {
                 unburrowingAnimationState.stop();
 
                 if (!burrowAnimPlayed) {
-                    this.burrowingAnimationState.start(this.age);
+                    this.burrowingAnimationState.start(this.tickCount);
                     burrowAnimPlayed = true;
                 }
                 this.isIdleAnimationRunning = false;
@@ -1108,7 +1119,7 @@ public class BoreEntity extends HostileEntity {
                 idleAnimationState.stop();
                 shootingAnimationState.stop();
 
-                this.unburrowingAnimationState.start(this.age);
+                this.unburrowingAnimationState.start(this.tickCount);
                 this.isIdleAnimationRunning = false;
             }
         }
@@ -1129,18 +1140,18 @@ public class BoreEntity extends HostileEntity {
         }
     }
 
-    private boolean isPathBlocked(Vec3d targetPos) {
-        if (this.getEntityWorld() == null || targetPos == null) return true;
+    private boolean isPathBlocked(Vec3 targetPos) {
+        if (this.level() == null || targetPos == null) return true;
 
-        Vec3d currentPos = this.getEntityPos();
-        Vec3d direction = targetPos.subtract(currentPos).normalize();
+        Vec3 currentPos = this.position();
+        Vec3 direction = targetPos.subtract(currentPos).normalize();
 
         for (double step = 1.0; step <= 3.0; step += 0.5) {
-            Vec3d checkPos = currentPos.add(direction.multiply(step));
+            Vec3 checkPos = currentPos.add(direction.scale(step));
             BlockPos blockPos = new BlockPos((int)checkPos.x, (int)checkPos.y, (int)checkPos.z);
 
-            if (this.getEntityWorld().getBlockState(blockPos).isSolidBlock(this.getEntityWorld(), blockPos) ||
-                    this.getEntityWorld().getBlockState(blockPos.up()).isSolidBlock(this.getEntityWorld(), blockPos.up())) {
+            if (this.level().getBlockState(blockPos).isRedstoneConductor(this.level(), blockPos) ||
+                    this.level().getBlockState(blockPos.above()).isRedstoneConductor(this.level(), blockPos.above())) {
                 return true;
             }
         }
@@ -1164,7 +1175,7 @@ public class BoreEntity extends HostileEntity {
                     (int)(this.getZ() + offsetZ)
             );
 
-            if (isPositionSafeForBurrowing(targetPos) && !isPathBlocked(new Vec3d(targetPos.getX(), targetPos.getY(), targetPos.getZ()))) {
+            if (isPositionSafeForBurrowing(targetPos) && !isPathBlocked(new Vec3(targetPos.getX(), targetPos.getY(), targetPos.getZ()))) {
                 return targetPos;
             }
         }
@@ -1173,7 +1184,7 @@ public class BoreEntity extends HostileEntity {
     }
 
     private void stopAllAnimations() {
-        if (this.getEntityWorld().isClient()) {
+        if (this.level().isClientSide()) {
             idleAnimationState.stop();
             shootingAnimationState.stop();
             burrowingAnimationState.stop();
@@ -1207,21 +1218,21 @@ public class BoreEntity extends HostileEntity {
         LivingEntity target = this.getTarget();
         if (target == null || !target.isAlive() || target.isRemoved()) return;
 
-        int nearbyShooters = (int) this.getEntityWorld().getEntitiesByClass(
+        int nearbyShooters = (int) this.level().getEntitiesOfClass(
                 BoreEntity.class,
-                this.getBoundingBox().expand(16.0),
+                this.getBoundingBox().inflate(16.0),
                 bore -> bore != this && bore.getBoreState() == BoreState.SHOOTING
         ).size();
 
         if (nearbyShooters >= 2) return;
 
-        this.getEntityWorld().getEntitiesByClass(
+        this.level().getEntitiesOfClass(
                 BoreEntity.class,
-                this.getBoundingBox().expand(8.0),
+                this.getBoundingBox().inflate(8.0),
                 bore -> bore != this && bore.isInCombat()
         ).forEach(ally -> {
-            Vec3d away = ally.getEntityPos().subtract(this.getEntityPos()).normalize();
-            ally.getNavigation().startMovingTo(
+            Vec3 away = ally.position().subtract(this.position()).normalize();
+            ally.getNavigation().moveTo(
                     ally.getX() + away.x * 6,
                     ally.getY(),
                     ally.getZ() + away.z * 6,
@@ -1231,7 +1242,7 @@ public class BoreEntity extends HostileEntity {
 
         shootCooldown = 40 + this.random.nextInt(20);
         this.setBoreState(BoreState.SHOOTING);
-        lastShootPosition = this.getEntityPos();
+        lastShootPosition = this.position();
         hasMovedEnoughToShoot = false;
         shootingDelay = 5 + this.random.nextInt(10);
     }
@@ -1271,39 +1282,39 @@ public class BoreEntity extends HostileEntity {
         LivingEntity target = this.getTarget();
         if (target == null || !target.isAlive() || target.isRemoved()) return;
 
-        Vec3d targetPos = predictTargetPosition(target);
+        Vec3 targetPos = predictTargetPosition(target);
         if (targetPos == null) return;
 
-        Vec3d direction = targetPos.subtract(this.getEntityPos()).normalize();
+        Vec3 direction = targetPos.subtract(this.position()).normalize();
 
         try {
-            EarthChargeProjectileEntity charge = new EarthChargeProjectileEntity(this.getEntityWorld(), this);
-            charge.setPosition(this.getX(), this.getEyeY(), this.getZ());
-            charge.setVelocity(direction.x, direction.y, direction.z, 1.2f, 0.05f);
-            this.getEntityWorld().spawnEntity(charge);
+            EarthChargeProjectileEntity charge = new EarthChargeProjectileEntity(this.level(), this);
+            charge.setPos(this.getX(), this.getEyeY(), this.getZ());
+            charge.shoot(direction.x, direction.y, direction.z, 1.2f, 0.05f);
+            this.level().addFreshEntity(charge);
         } catch (Exception e) {
         }
     }
 
-    private Vec3d predictTargetPosition(LivingEntity target) {
+    private Vec3 predictTargetPosition(LivingEntity target) {
         if (target == null || !target.isAlive() || target.isRemoved()) {
-            return this.getEntityPos();
+            return this.position();
         }
 
         try {
-            Vec3d targetVelocity = target.getVelocity();
+            Vec3 targetVelocity = target.getDeltaMovement();
             if (targetVelocity == null) {
-                targetVelocity = Vec3d.ZERO;
+                targetVelocity = Vec3.ZERO;
             }
 
             double projectileSpeed = 1.2;
             double distance = this.distanceTo(target);
             double timeToHit = distance / projectileSpeed;
 
-            Vec3d predictedPos = target.getEntityPos().add(targetVelocity.multiply(timeToHit));
-            return predictedPos.add(0, target.getStandingEyeHeight() - 1.0, 0);
+            Vec3 predictedPos = target.position().add(targetVelocity.scale(timeToHit));
+            return predictedPos.add(0, target.getEyeHeight() - 1.0, 0);
         } catch (Exception e) {
-            return target.getEntityPos();
+            return target.position();
         }
     }
 
@@ -1328,7 +1339,7 @@ public class BoreEntity extends HostileEntity {
     }
 
     private int getTypeVariant() {
-        return this.dataTracker.get(DATA_ID_TYPE_VARIANT);
+        return this.entityData.get(DATA_ID_TYPE_VARIANT);
     }
 
     public BoreVariant getVariant() {
@@ -1336,7 +1347,7 @@ public class BoreEntity extends HostileEntity {
     }
 
     public void setVariant(BoreVariant variant) {
-        this.dataTracker.set(DATA_ID_TYPE_VARIANT, variant.getId() & 255);
+        this.entityData.set(DATA_ID_TYPE_VARIANT, variant.getId() & 255);
     }
 
     public boolean isDarkVariant() {
@@ -1345,15 +1356,15 @@ public class BoreEntity extends HostileEntity {
 
     @Nullable
     @Override
-    public EntityData initialize(ServerWorldAccess world, LocalDifficulty difficulty, SpawnReason spawnReason, @Nullable EntityData entityData) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor world, DifficultyInstance difficulty, EntitySpawnReason spawnReason, @Nullable SpawnGroupData entityData) {
         BoreVariant variant = world.getRandom().nextFloat() < 0.005f ? BoreVariant.DARK : BoreVariant.NORMAL;
         setVariant(variant);
-        return super.initialize(world, difficulty, spawnReason, entityData);
+        return super.finalizeSpawn(world, difficulty, spawnReason, entityData);
     }
 
     @Override
-    public void writeCustomData(WriteView nbt) {
-        super.writeCustomData(nbt);
+    public void addAdditionalSaveData(ValueOutput nbt) {
+        super.addAdditionalSaveData(nbt);
         nbt.putString("BoreState", boreState.name());
         nbt.putInt("StateTimer", stateTimer);
         nbt.putInt("Variant", this.getTypeVariant());
@@ -1387,77 +1398,77 @@ public class BoreEntity extends HostileEntity {
         }
     }
 
-    public void readCustomData(ReadView nbt) {
-        super.readCustomData(nbt);
-        String stateString = nbt.getString("BoreState", "IDLE");
+    public void readAdditionalSaveData(ValueInput nbt) {
+        super.readAdditionalSaveData(nbt);
+        String stateString = nbt.getStringOr("BoreState", "IDLE");
         if (!stateString.equals("IDLE")) {
             try {
                 BoreState loadedState = BoreState.valueOf(stateString);
                 this.boreState = loadedState;
-                if (!this.getEntityWorld().isClient()) {
-                    this.dataTracker.set(DATA_ID_STATE, loadedState.ordinal());
+                if (!this.level().isClientSide()) {
+                    this.entityData.set(DATA_ID_STATE, loadedState.ordinal());
                 }
             } catch (IllegalArgumentException e) {
                 this.boreState = BoreState.IDLE;
             }
         }
 
-        this.stateTimer = nbt.getInt("StateTimer", 0);
-        this.dataTracker.set(DATA_ID_TYPE_VARIANT, nbt.getInt("Variant", 0));
-        this.hasMovedEnoughToShoot = nbt.getBoolean("HasMovedEnoughToShoot", false);
-        this.isInCombat = nbt.getBoolean("IsInCombat", false);
-        this.combatStartTime = nbt.getInt("CombatStartTime", 0);
-        this.circlingAngle = nbt.getDouble("CirclingAngle", 0.0);
-        this.circlingDirection = nbt.getInt("CirclingDirection", 1);
-        this.shootingDelay = nbt.getInt("ShootingDelay", 0);
-        this.stuckTimer = nbt.getInt("StuckTimer", 0);
-        this.burrowCooldownTimer = nbt.getInt("BurrowCooldownTimer", 0);
+        this.stateTimer = nbt.getIntOr("StateTimer", 0);
+        this.entityData.set(DATA_ID_TYPE_VARIANT, nbt.getIntOr("Variant", 0));
+        this.hasMovedEnoughToShoot = nbt.getBooleanOr("HasMovedEnoughToShoot", false);
+        this.isInCombat = nbt.getBooleanOr("IsInCombat", false);
+        this.combatStartTime = nbt.getIntOr("CombatStartTime", 0);
+        this.circlingAngle = nbt.getDoubleOr("CirclingAngle", 0.0);
+        this.circlingDirection = nbt.getIntOr("CirclingDirection", 1);
+        this.shootingDelay = nbt.getIntOr("ShootingDelay", 0);
+        this.stuckTimer = nbt.getIntOr("StuckTimer", 0);
+        this.burrowCooldownTimer = nbt.getIntOr("BurrowCooldownTimer", 0);
 
-        double stuckCheckX = nbt.getDouble("StuckCheckX", Double.NaN);
+        double stuckCheckX = nbt.getDoubleOr("StuckCheckX", Double.NaN);
         if (!Double.isNaN(stuckCheckX)) {
-            this.stuckCheckPosition = new Vec3d(
+            this.stuckCheckPosition = new Vec3(
                     stuckCheckX,
-                    nbt.getDouble("StuckCheckY", 0.0),
-                    nbt.getDouble("StuckCheckZ", 0.0)
+                    nbt.getDoubleOr("StuckCheckY", 0.0),
+                    nbt.getDoubleOr("StuckCheckZ", 0.0)
             );
         }
 
-        long relocateTargetLong = nbt.getLong("RelocateTarget", Long.MIN_VALUE);
+        long relocateTargetLong = nbt.getLongOr("RelocateTarget", Long.MIN_VALUE);
         if (relocateTargetLong != Long.MIN_VALUE) {
-            this.relocateTarget = BlockPos.fromLong(relocateTargetLong);
+            this.relocateTarget = BlockPos.of(relocateTargetLong);
         }
 
-        double lastShootX = nbt.getDouble("LastShootX", Double.NaN);
+        double lastShootX = nbt.getDoubleOr("LastShootX", Double.NaN);
         if (!Double.isNaN(lastShootX)) {
-            this.lastShootPosition = new Vec3d(
+            this.lastShootPosition = new Vec3(
                     lastShootX,
-                    nbt.getDouble("LastShootY", 0.0),
-                    nbt.getDouble("LastShootZ", 0.0)
+                    nbt.getDoubleOr("LastShootY", 0.0),
+                    nbt.getDoubleOr("LastShootZ", 0.0)
             );
         }
 
-        double circlingCenterX = nbt.getDouble("CirclingCenterX", Double.NaN);
+        double circlingCenterX = nbt.getDoubleOr("CirclingCenterX", Double.NaN);
         if (!Double.isNaN(circlingCenterX)) {
-            this.circlingCenter = new Vec3d(
+            this.circlingCenter = new Vec3(
                     circlingCenterX,
-                    nbt.getDouble("CirclingCenterY", 0.0),
-                    nbt.getDouble("CirclingCenterZ", 0.0)
+                    nbt.getDoubleOr("CirclingCenterY", 0.0),
+                    nbt.getDoubleOr("CirclingCenterZ", 0.0)
             );
         }
     }
 
     private static class BoreCircleGoal extends Goal {
         private final BoreEntity bore;
-        private Vec3d targetPosition;
+        private Vec3 targetPosition;
         private int repositionTimer = 0;
 
         public BoreCircleGoal(BoreEntity bore) {
             this.bore = bore;
-            this.setControls(EnumSet.of(Control.MOVE));
+            this.setFlags(EnumSet.of(Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             LivingEntity target = bore.getTarget();
             return bore.isInCombat() &&
                     target != null &&
@@ -1480,26 +1491,26 @@ public class BoreEntity extends HostileEntity {
             bore.updateCirclingAngle();
 
             if (repositionTimer >= 10 ||
-                    (targetPosition != null && bore.squaredDistanceTo(targetPosition) < 2.0)) {
+                    (targetPosition != null && bore.distanceToSqr(targetPosition) < 2.0)) {
                 targetPosition = bore.getCirclingPosition();
                 repositionTimer = 0;
             }
 
             if (targetPosition != null) {
-                bore.getNavigation().startMovingTo(targetPosition.x, targetPosition.y, targetPosition.z, 1.2);
+                bore.getNavigation().moveTo(targetPosition.x, targetPosition.y, targetPosition.z, 1.2);
             }
 
             LivingEntity target = bore.getTarget();
             if (target != null && target.isAlive() && !target.isRemoved()) {
                 try {
-                    bore.getLookControl().lookAt(target.getX(), target.getEyeY(), target.getZ());
+                    bore.getLookControl().setLookAt(target.getX(), target.getEyeY(), target.getZ());
                 } catch (Exception e) {
                 }
             }
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             LivingEntity target = bore.getTarget();
             return bore.isInCombat() &&
                     target != null &&
@@ -1512,15 +1523,15 @@ public class BoreEntity extends HostileEntity {
 
     private static class BoreAvoidProjectileGoal extends Goal {
         private final BoreEntity bore;
-        private Vec3d avoidanceDirection;
+        private Vec3 avoidanceDirection;
 
         public BoreAvoidProjectileGoal(BoreEntity bore) {
             this.bore = bore;
-            this.setControls(EnumSet.of(Control.MOVE));
+            this.setFlags(EnumSet.of(Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             if (bore.getBoreState() != BoreState.IDLE) return false;
 
             avoidanceDirection = bore.getProjectileAvoidanceDirection();
@@ -1530,13 +1541,13 @@ public class BoreEntity extends HostileEntity {
         @Override
         public void tick() {
             if (avoidanceDirection != null) {
-                Vec3d targetPos = bore.getEntityPos().add(avoidanceDirection.multiply(6.0));
-                bore.getNavigation().startMovingTo(targetPos.x, targetPos.y, targetPos.z, 1.5);
+                Vec3 targetPos = bore.position().add(avoidanceDirection.scale(6.0));
+                bore.getNavigation().moveTo(targetPos.x, targetPos.y, targetPos.z, 1.5);
             }
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             return (bore.isNearbyProjectileDangerous() || bore.isNearFriendlyProjectile()) &&
                     bore.getBoreState() == BoreState.IDLE;
         }
@@ -1544,15 +1555,15 @@ public class BoreEntity extends HostileEntity {
 
     private static class BoreSmartPositioningGoal extends Goal {
         private final BoreEntity bore;
-        private Vec3d optimalPosition;
+        private Vec3 optimalPosition;
 
         public BoreSmartPositioningGoal(BoreEntity bore) {
             this.bore = bore;
-            this.setControls(EnumSet.of(Control.MOVE));
+            this.setFlags(EnumSet.of(Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             LivingEntity target = bore.getTarget();
             if (target == null || target.isRemoved() || !target.isAlive() || bore.getBoreState() != BoreState.IDLE) return false;
 
@@ -1570,11 +1581,11 @@ public class BoreEntity extends HostileEntity {
             return false;
         }
 
-        private Vec3d findOptimalPosition(LivingEntity target) {
+        private Vec3 findOptimalPosition(LivingEntity target) {
             if (target == null || target.isRemoved() || !target.isAlive()) return null;
 
             try {
-                Vec3d targetPos = target.getEntityPos();
+                Vec3 targetPos = target.position();
                 if (targetPos == null) return null;
 
                 double optimalDistance = 8.0;
@@ -1587,7 +1598,7 @@ public class BoreEntity extends HostileEntity {
                     BlockPos testPos = new BlockPos((int)x, (int)targetPos.y, (int)z);
 
                     if (bore.isPositionSafe(testPos)) {
-                        return new Vec3d(x, targetPos.y, z);
+                        return new Vec3(x, targetPos.y, z);
                     }
                 }
             } catch (Exception e) {
@@ -1599,14 +1610,14 @@ public class BoreEntity extends HostileEntity {
         @Override
         public void tick() {
             if (optimalPosition != null) {
-                bore.getNavigation().startMovingTo(optimalPosition.x, optimalPosition.y, optimalPosition.z, 1.0);
+                bore.getNavigation().moveTo(optimalPosition.x, optimalPosition.y, optimalPosition.z, 1.0);
             }
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             return optimalPosition != null &&
-                    bore.squaredDistanceTo(optimalPosition) > 4.0 &&
+                    bore.distanceToSqr(optimalPosition) > 4.0 &&
                     bore.getBoreState() == BoreState.IDLE;
         }
     }
@@ -1616,26 +1627,26 @@ public class BoreEntity extends HostileEntity {
 
         public BoreRelocateGoal(BoreEntity bore) {
             this.bore = bore;
-            this.setControls(EnumSet.of(Control.MOVE));
+            this.setFlags(EnumSet.of(Flag.MOVE));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             return bore.getRelocationTarget() != null &&
                     bore.getBoreState() == BoreState.IDLE;
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             BlockPos target = bore.getRelocationTarget();
-            return target != null && bore.squaredDistanceTo(target.getX(), target.getY(), target.getZ()) > 4.0;
+            return target != null && bore.distanceToSqr(target.getX(), target.getY(), target.getZ()) > 4.0;
         }
 
         @Override
         public void tick() {
             BlockPos target = bore.getRelocationTarget();
             if (target != null) {
-                bore.getNavigation().startMovingTo(target.getX(), target.getY(), target.getZ(), 1.0);
+                bore.getNavigation().moveTo(target.getX(), target.getY(), target.getZ(), 1.0);
             }
         }
 
@@ -1645,18 +1656,18 @@ public class BoreEntity extends HostileEntity {
         }
     }
 
-    private static class BoreFleeGoal extends FleeEntityGoal<PlayerEntity> {
+    private static class BoreFleeGoal extends AvoidEntityGoal<Player> {
         private final BoreEntity bore;
 
         public BoreFleeGoal(BoreEntity bore) {
-            super(bore, PlayerEntity.class, 6.0F, 1.2, 1.5);
+            super(bore, Player.class, 6.0F, 1.2, 1.5);
             this.bore = bore;
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             LivingEntity target = bore.getTarget();
-            return super.canStart() &&
+            return super.canUse() &&
                     bore.getBoreState() != BoreState.SHOOTING &&
                     bore.getBoreState() != BoreState.BURROWING &&
                     bore.getBoreState() != BoreState.UNBURROWING &&
@@ -1674,11 +1685,11 @@ public class BoreEntity extends HostileEntity {
 
         public BoreShootGoal(BoreEntity bore) {
             this.bore = bore;
-            this.setControls(EnumSet.of(Control.LOOK));
+            this.setFlags(EnumSet.of(Flag.LOOK));
         }
 
         @Override
-        public boolean canStart() {
+        public boolean canUse() {
             LivingEntity target = bore.getTarget();
             return target != null &&
                     bore.shootCooldown <= 0 &&
@@ -1699,7 +1710,7 @@ public class BoreEntity extends HostileEntity {
             LivingEntity target = bore.getTarget();
             if (target != null && target.isAlive() && !target.isRemoved()) {
                 try {
-                    bore.getLookControl().lookAt(target.getX(), target.getEyeY(), target.getZ());
+                    bore.getLookControl().setLookAt(target.getX(), target.getEyeY(), target.getZ());
 
                     if (--aimTimer <= 0) {
                         bore.tryShootAtPlayer();
@@ -1712,7 +1723,7 @@ public class BoreEntity extends HostileEntity {
         }
 
         @Override
-        public boolean shouldContinue() {
+        public boolean canContinueToUse() {
             LivingEntity target = bore.getTarget();
             return target != null &&
                     bore.getBoreState() != BoreState.SHOOTING &&
@@ -1726,19 +1737,19 @@ public class BoreEntity extends HostileEntity {
         }
     }
 
-    private static final TrackedData<Integer> DATA_ID_STATE =
-            DataTracker.registerData(BoreEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    private static final EntityDataAccessor<Integer> DATA_ID_STATE =
+            SynchedEntityData.defineId(BoreEntity.class, EntityDataSerializers.INT);
 
     private void syncStateToClients() {
-        if (!this.getEntityWorld().isClient()) {
-            this.dataTracker.set(DATA_ID_STATE, this.boreState.ordinal());
+        if (!this.level().isClientSide()) {
+            this.entityData.set(DATA_ID_STATE, this.boreState.ordinal());
         }
     }
 
     @Override
-    public void onTrackedDataSet(TrackedData<?> data) {
-        if (DATA_ID_STATE.equals(data) && this.getEntityWorld().isClient()) {
-            BoreState newState = BoreState.values()[this.dataTracker.get(DATA_ID_STATE)];
+    public void onSyncedDataUpdated(EntityDataAccessor<?> data) {
+        if (DATA_ID_STATE.equals(data) && this.level().isClientSide()) {
+            BoreState newState = BoreState.values()[this.entityData.get(DATA_ID_STATE)];
             if (this.boreState != newState && !isChangingState) {
                 isChangingState = true;
 
@@ -1752,19 +1763,19 @@ public class BoreEntity extends HostileEntity {
                 isChangingState = false;
             }
         }
-        super.onTrackedDataSet(data);
+        super.onSyncedDataUpdated(data);
     }
 
     private void addBurrowParticles(AnimationState animationState) {
-        if (this.getEntityWorld().isClient() && animationState.isRunning()) {
-            BlockState blockState = this.getSteppingBlockState();
-            if (blockState.getRenderType() != BlockRenderType.INVISIBLE) {
-                Random random = this.getRandom();
+        if (this.level().isClientSide() && animationState.isStarted()) {
+            BlockState blockState = this.getBlockStateOn();
+            if (blockState.getRenderShape() != RenderShape.INVISIBLE) {
+                RandomSource random = this.getRandom();
                 for (int i = 0; i < 7; ++i) {
-                    double d = this.getX() + (double)MathHelper.nextBetween(random, -0.3F, 0.3F);
+                    double d = this.getX() + (double)Mth.randomBetween(random, -0.3F, 0.3F);
                     double e = this.getY();
-                    double f = this.getZ() + (double)MathHelper.nextBetween(random, -0.3F, 0.3F);
-                    this.getEntityWorld().addParticleClient(new BlockStateParticleEffect(ParticleTypes.BLOCK, blockState), d, e, f, 0.0, 0.0, 0.0);
+                    double f = this.getZ() + (double)Mth.randomBetween(random, -0.3F, 0.3F);
+                    this.level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, blockState), d, e, f, 0.0, 0.0, 0.0);
                 }
             }
         }

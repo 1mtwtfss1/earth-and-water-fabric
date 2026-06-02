@@ -1,12 +1,11 @@
 package potatowolfie.earth_and_water.util;
 
-import net.minecraft.block.Block;
-import net.minecraft.entity.EntityType;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.gen.structure.Structure;
-import net.minecraft.world.gen.structure.StructureType;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.structure.StructureType;
 import potatowolfie.earth_and_water.EarthWater;
 
 public class ModTags {
@@ -24,26 +23,27 @@ public class ModTags {
         public static final TagKey<Block> HAS_STEEL = createTag("has_steel");
 
         private static TagKey<Block> createTag(String name) {
-            return TagKey.of(RegistryKeys.BLOCK, Identifier.of(EarthWater.MOD_ID, name));
+            return TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, name));
         }
     }
 
     public static class Item {
-        public static final TagKey<net.minecraft.item.Item> BATTLE_AXE = createTag("battle_axe");
-        public static final TagKey<net.minecraft.item.Item> BATTLE_AXE_ENCHANTABLE = createTag("battle_axe_enchantable");
-        public static final TagKey<net.minecraft.item.Item> SPIKED_SHIELD = createTag("spiked_shield");
-        public static final TagKey<net.minecraft.item.Item> STEEL_REPAIR = createTag("steel_repair");
-        public static final TagKey<net.minecraft.item.Item> PRISMARINE_REPAIR = createTag("prismarine_repair");
+        public static final TagKey<net.minecraft.world.item.Item> BATTLE_AXE = createTag("battle_axe");
+        public static final TagKey<net.minecraft.world.item.Item> BATTLE_AXE_ENCHANTABLE = createTag("battle_axe_enchantable");
+        public static final TagKey<net.minecraft.world.item.Item> SPIKED_SHIELD = createTag("spiked_shield");
+        public static final TagKey<net.minecraft.world.item.Item> STEEL_REPAIR = createTag("steel_repair");
+        public static final TagKey<net.minecraft.world.item.Item> PRISMARINE_REPAIR = createTag("prismarine_repair");
 
-        private static TagKey<net.minecraft.item.Item> createTag(String name) {
-            return TagKey.of(RegistryKeys.ITEM, Identifier.of(EarthWater.MOD_ID, name));
+        private static TagKey<net.minecraft.world.item.Item> createTag(String name) {
+            return TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, name));
         }
     }
 
     public static class Entities {
-
+        public static final TagKey<EntityType<?>> CONDUIT_IMMUNE = TagKey.create(
+                Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath("earth-and-water", "conduit_immune"));
         private static TagKey<EntityType<?>> createTag(String name) {
-            return TagKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(EarthWater.MOD_ID, name));
+            return TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, name));
         }
     }
 
@@ -51,7 +51,7 @@ public class ModTags {
         public static final TagKey<StructureType<?>> IS_ANCIENT_RUINS = createTag("is_ancient_ruins");
 
         private static TagKey<StructureType<?>> createTag(String name) {
-            return TagKey.of(RegistryKeys.STRUCTURE_TYPE, Identifier.of(EarthWater.MOD_ID, name));
+            return TagKey.create(Registries.STRUCTURE_TYPE, Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, name));
         }
     }
 }

@@ -1,171 +1,175 @@
 package potatowolfie.earth_and_water.block.custom;
 
 import com.mojang.serialization.MapCodec;
-import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.fluid.Fluids;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.BooleanProperty;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.World;
-import net.minecraft.world.WorldView;
-import net.minecraft.world.tick.ScheduledTickView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.SimpleWaterloggedBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.BlockHitResult;
 import potatowolfie.earth_and_water.advancement.MobLockHandler;
 import potatowolfie.earth_and_water.block.entity.ModBlockEntities;
 import potatowolfie.earth_and_water.block.entity.custom.ReinforcedSpawnerBlockEntity;
 import potatowolfie.earth_and_water.item.custom.ReinforcedKeyItem;
 
-public class ReinforcedSpawnerBlock extends BlockWithEntity implements Waterloggable {
-    public static final BooleanProperty ACTIVE = BooleanProperty.of("active");
-    public static final BooleanProperty KEYHOLE = BooleanProperty.of("keyhole");
-    public static final BooleanProperty WATERLOGGED = Properties.WATERLOGGED;
+public class ReinforcedSpawnerBlock extends BaseEntityBlock implements SimpleWaterloggedBlock {
+    public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
+    public static final BooleanProperty KEYHOLE = BooleanProperty.create("keyhole");
+    public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
-    public ReinforcedSpawnerBlock(Settings settings) {
+    public ReinforcedSpawnerBlock(Properties settings) {
         super(settings);
-        setDefaultState(getDefaultState()
-                .with(ACTIVE, false)
-                .with(KEYHOLE, false)
-                .with(WATERLOGGED, false));
+        registerDefaultState(defaultBlockState()
+                .setValue(ACTIVE, false)
+                .setValue(KEYHOLE, false)
+                .setValue(WATERLOGGED, false));
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(ACTIVE, KEYHOLE, WATERLOGGED);
     }
 
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        FluidState fluidState = ctx.getWorld().getFluidState(ctx.getBlockPos());
-        return this.getDefaultState()
-                .with(WATERLOGGED, fluidState.getFluid() == Fluids.WATER);
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        FluidState fluidState = ctx.getLevel().getFluidState(ctx.getClickedPos());
+        return this.defaultBlockState()
+                .setValue(WATERLOGGED, fluidState.getType() == Fluids.WATER);
     }
 
     @Override
     public FluidState getFluidState(BlockState state) {
-        return state.get(WATERLOGGED) ? Fluids.WATER.getStill(false) : super.getFluidState(state);
+        return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : super.getFluidState(state);
     }
 
     @Override
-    public BlockState getStateForNeighborUpdate(
+    public BlockState updateShape(
             BlockState state,
-            WorldView world,
-            ScheduledTickView tickView,
+            LevelReader world,
+            ScheduledTickAccess tickView,
             BlockPos pos,
             Direction direction,
             BlockPos neighborPos,
             BlockState neighborState,
-            Random random
+            RandomSource random
     ) {
-        if (state.get(WATERLOGGED)) {
-            tickView.scheduleFluidTick(pos, Fluids.WATER, Fluids.WATER.getTickRate(world));
+        if (state.getValue(WATERLOGGED)) {
+            tickView.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(world));
         }
-        return super.getStateForNeighborUpdate(state, world, tickView, pos, direction, neighborPos, neighborState, random);
+        return super.updateShape(state, world, tickView, pos, direction, neighborPos, neighborState, random);
     }
 
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new ReinforcedSpawnerBlockEntity(pos, state);
     }
 
     @Override
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        return validateTicker(type, ModBlockEntities.REINFORCED_SPAWNER_BLOCK_ENTITY,
-                world.isClient() ? ReinforcedSpawnerBlockEntity::clientTick : ReinforcedSpawnerBlockEntity::serverTick);
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level world, BlockState state, BlockEntityType<T> type) {
+        return createTickerHelper(type, ModBlockEntities.REINFORCED_SPAWNER_BLOCK_ENTITY,
+                world.isClientSide() ? ReinforcedSpawnerBlockEntity::clientTick : ReinforcedSpawnerBlockEntity::serverTick);
     }
 
     @Override
-    protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player,
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player,
                                  BlockHitResult hit) {
-        if (world.isClient()) return ActionResult.SUCCESS;
-        ItemStack stack = player.getMainHandStack();
+        if (world.isClientSide()) return InteractionResult.SUCCESS;
+        ItemStack stack = player.getMainHandItem();
 
         if (world.getBlockEntity(pos) instanceof ReinforcedSpawnerBlockEntity spawner) {
             if (stack.getItem() instanceof SpawnEggItem spawnEggItem) {
-                EntityType<?> entityType = spawnEggItem.getEntityType(stack);
+                EntityType<?> entityType = spawnEggItem.getType(stack);
 
                 spawner.setEntityType(entityType);
 
-                if (!player.getAbilities().creativeMode) {
-                    stack.decrement(1);
+                if (!player.getAbilities().instabuild) {
+                    stack.shrink(1);
                 }
 
-                world.playSound(null, pos, SoundEvents.BLOCK_TRIAL_SPAWNER_SPAWN_MOB,
-                        SoundCategory.BLOCKS, 1.0f, 1.0f);
+                world.playSound(null, pos, SoundEvents.TRIAL_SPAWNER_SPAWN_MOB,
+                        SoundSource.BLOCKS, 1.0f, 1.0f);
 
-                return ActionResult.SUCCESS;
+                return InteractionResult.SUCCESS;
             }
 
             if (stack.getItem() instanceof ReinforcedKeyItem) {
                 if (!spawner.canUseKey(world)) {
-                    return ActionResult.PASS;
+                    return InteractionResult.PASS;
                 }
 
-                if (!state.get(ACTIVE) && state.get(KEYHOLE)) {
+                if (!state.getValue(ACTIVE) && state.getValue(KEYHOLE)) {
                     if (spawner.getEntityType() != null) {
-                        world.setBlockState(pos, state
-                                .with(ACTIVE, true)
-                                .with(KEYHOLE, false), 3);
+                        world.setBlock(pos, state
+                                .setValue(ACTIVE, true)
+                                .setValue(KEYHOLE, false), 3);
                         spawner.activate();
                         spawner.onKeyUsed(world);
 
-                        if (!player.getAbilities().creativeMode) {
-                            stack.decrement(1);
+                        if (!player.getAbilities().instabuild) {
+                            stack.shrink(1);
                         }
 
-                        world.playSound(null, pos, SoundEvents.BLOCK_VAULT_DEACTIVATE,
-                                SoundCategory.BLOCKS, 1.0f, 1.0f);
+                        world.playSound(null, pos, SoundEvents.VAULT_DEACTIVATE,
+                                SoundSource.BLOCKS, 1.0f, 1.0f);
 
-                        return ActionResult.SUCCESS;
+                        return InteractionResult.SUCCESS;
                     }
-                } else if (state.get(ACTIVE)) {
-                    world.setBlockState(pos, state
-                            .with(ACTIVE, false)
-                            .with(KEYHOLE, false), 3);
+                } else if (state.getValue(ACTIVE)) {
+                    world.setBlock(pos, state
+                            .setValue(ACTIVE, false)
+                            .setValue(KEYHOLE, false), 3);
                     spawner.deactivate();
                     spawner.onKeyUsed(world);
 
-                    if (!player.getAbilities().creativeMode) {
-                        stack.decrement(1);
+                    if (!player.getAbilities().instabuild) {
+                        stack.shrink(1);
                     }
 
-                    world.playSound(null, pos, SoundEvents.BLOCK_VAULT_DEACTIVATE,
-                            SoundCategory.BLOCKS, 1.0f, 1.0f);
+                    world.playSound(null, pos, SoundEvents.VAULT_DEACTIVATE,
+                            SoundSource.BLOCKS, 1.0f, 1.0f);
 
-                    if (player instanceof ServerPlayerEntity serverPlayer) {
+                    if (player instanceof ServerPlayer serverPlayer) {
                         MobLockHandler.grantDeactivateSpawnerAdvancement(serverPlayer);
                     }
 
-                    return ActionResult.SUCCESS;
+                    return InteractionResult.SUCCESS;
                 }
             }
         }
 
-        return ActionResult.PASS;
+        return InteractionResult.PASS;
     }
 
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
     }
 
     @Override
-    protected MapCodec<? extends BlockWithEntity> getCodec() {
+    protected MapCodec<? extends BaseEntityBlock> codec() {
         return null;
     }
 }

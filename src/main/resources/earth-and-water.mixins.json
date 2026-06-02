@@ -15,8 +15,6 @@
     "defaultRequire": 1
   },
   "client": [
-    "BrineCameraMixin",
-    "BrineSpectatorMixin",
     "ShieldEntityModelMixin",
     "SplashTextMixin"
   ]

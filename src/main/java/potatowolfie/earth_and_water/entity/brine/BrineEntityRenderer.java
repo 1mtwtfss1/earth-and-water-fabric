@@ -1,47 +1,58 @@
 package potatowolfie.earth_and_water.entity.brine;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.render.entity.MobEntityRenderer;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.resources.Identifier;
 import potatowolfie.earth_and_water.EarthWater;
 import potatowolfie.earth_and_water.entity.client.ModEntityModelLayers;
 
 @Environment(EnvType.CLIENT)
-public class BrineEntityRenderer extends MobEntityRenderer<BrineEntity, BrineEntityRenderState, BrineEntityModel> {
-    private static final Identifier TEXTURE = Identifier.of(EarthWater.MOD_ID, "textures/entity/brine/brine.png");
+public class BrineEntityRenderer extends MobRenderer<BrineEntity, BrineEntityRenderState, BrineEntityModel> {
+    private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "textures/entity/brine/brine.png");
 
-    public BrineEntityRenderer(EntityRendererFactory.Context context) {
-        super(context, new BrineEntityModel(context.getPart(ModEntityModelLayers.BRINE)), 0.5F);
-        this.addFeature(new BrineEntityEyesFeatureRenderer(this));
+    public BrineEntityRenderer(EntityRendererProvider.Context context) {
+        super(context, new BrineEntityModel(context.bakeLayer(ModEntityModelLayers.BRINE)), 0.5F);
+        this.addLayer(new BrineEntityEyesFeatureRenderer(this));
     }
 
-    public void render(BrineEntityRenderState brineEntityRenderState, MatrixStack matrixStack, OrderedRenderCommandQueue queue, CameraRenderState cameraRenderState) {
-        BrineEntityModel brineEntityModel = (BrineEntityModel)this.getModel();
-        updatePartVisibility(brineEntityModel, brineEntityModel.getHead(), brineEntityModel.getRodsTop(), brineEntityModel.getRodsBottom());
-        super.render(brineEntityRenderState, matrixStack, queue, cameraRenderState);
-    }
+    @Override
+    public void submit(final BrineEntityRenderState state,
+                       final PoseStack poseStack,
+                       final SubmitNodeCollector submitNodeCollector,
+                       final CameraRenderState camera) {
 
-    public Identifier getTexture(BrineEntityRenderState brineEntityRenderState) {
-        return TEXTURE;
+        BrineEntityModel model = (BrineEntityModel) this.getModel();
+
+        updatePartVisibility(
+                model,
+                model.getHead(),
+                model.getRodsTop(),
+                model.getRodsBottom()
+        );
+
+        super.submit(state, poseStack, submitNodeCollector, camera);
     }
 
     public BrineEntityRenderState createRenderState() {
         return new BrineEntityRenderState();
     }
 
-    public void updateRenderState(BrineEntity brineEntity, BrineEntityRenderState brineEntityRenderState, float f) {
-        super.updateRenderState(brineEntity, brineEntityRenderState, f);
-        brineEntityRenderState.idleAnimationState.copyFrom(brineEntity.idleAnimationState);
-        brineEntityRenderState.underwaterAnimationState.copyFrom(brineEntity.underwaterAnimationState);
-        brineEntityRenderState.attackAnimationState.copyFrom(brineEntity.attackAnimationState);
-    }
+    @Override
+    public void extractRenderState(final BrineEntity entity,
+                                   final BrineEntityRenderState state,
+                                   final float partialTicks) {
+        super.extractRenderState(entity, state, partialTicks);
 
+        state.idleAnimationState.copyFrom(entity.idleAnimationState);
+        state.underwaterAnimationState.copyFrom(entity.underwaterAnimationState);
+        state.attackAnimationState.copyFrom(entity.attackAnimationState);
+    }
 
     public static BrineEntityModel updatePartVisibility(BrineEntityModel model, ModelPart... modelParts) {
         model.getHead().visible = false;
@@ -58,5 +69,10 @@ public class BrineEntityRenderer extends MobEntityRenderer<BrineEntity, BrineEnt
         }
 
         return model;
+    }
+
+    @Override
+    public Identifier getTextureLocation(BrineEntityRenderState state) {
+        return TEXTURE;
     }
 }

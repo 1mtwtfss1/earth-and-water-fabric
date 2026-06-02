@@ -1,24 +1,24 @@
 package potatowolfie.earth_and_water.advancement;
 
-import net.minecraft.advancement.AdvancementEntry;
-import net.minecraft.advancement.AdvancementProgress;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.level.ServerPlayer;
 
 public class MobLockHandler {
 
-    public static void grantDeactivateSpawnerAdvancement(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
+    public static void grantDeactivateSpawnerAdvancement(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) return;
 
-        Identifier advId = Identifier.of("earth-and-water", "mob_lock");
-        AdvancementEntry advancement = server.getAdvancementLoader().get(advId);
+        Identifier advId = Identifier.fromNamespaceAndPath("earth-and-water", "mob_lock");
+        AdvancementHolder advancement = server.getAdvancements().get(advId);
 
         if (advancement != null) {
-            AdvancementProgress progress = player.getAdvancementTracker().getProgress(advancement);
+            AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
             if (!progress.isDone()) {
-                player.getAdvancementTracker().grantCriterion(advancement, "mob_lock");
+                player.getAdvancements().award(advancement, "mob_lock");
             }
         }
     }

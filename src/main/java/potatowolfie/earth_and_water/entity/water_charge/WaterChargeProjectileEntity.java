@@ -1,52 +1,56 @@
 package potatowolfie.earth_and_water.entity.water_charge;
 
-import net.minecraft.block.DispenserBlock;
-import net.minecraft.block.dispenser.DispenserBehavior;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.state.property.Properties;
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.*;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.dispenser.BlockSource;
+import net.minecraft.core.dispenser.DispenseItemBehavior;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 import potatowolfie.earth_and_water.damage.ModDamageTypes;
 import potatowolfie.earth_and_water.effect.ModEffects;
 import potatowolfie.earth_and_water.entity.ModEntities;
 import potatowolfie.earth_and_water.item.ModItems;
 
 import java.util.List;
-
-import net.minecraft.entity.effect.StatusEffectInstance;
 import potatowolfie.earth_and_water.util.ExplosionUtil;
 
-public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
+public class WaterChargeProjectileEntity extends AbstractArrow {
     boolean isStuck = false;
     private Entity attachedEntity = null;
     private BlockPos attachedBlock = null;
     private Direction attachedFace = null;
-    private Vec3d exactHitPosition = null;
+    private Vec3 exactHitPosition = null;
 
     private int stuckTicks = -1;
     private static final int TICKS_TO_EXPLODE = 40;
 
     private float initialEntityYaw = 0;
 
-    private Vec3d initialDirection = null;
+    private Vec3 initialDirection = null;
 
     private static final float DIRECT_DAMAGE = 4.5F;
     private static final float INDIRECT_KNOCKBACK_RADIUS = 5.0F;
@@ -62,50 +66,50 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     private boolean isPerformingBubbleEffect = false;
     private boolean isDirectHit = false;
 
-    public WaterChargeProjectileEntity(EntityType<? extends PersistentProjectileEntity> entityType, World world) {
+    public WaterChargeProjectileEntity(EntityType<? extends AbstractArrow> entityType, Level world) {
         super(entityType, world);
-        this.setNoClip(false);
-        this.setDamage(0);
+        this.setNoPhysics(false);
+        this.setBaseDamage(0);
         this.setNoGravity(false);
     }
 
-    public WaterChargeProjectileEntity(World world, PlayerEntity player) {
+    public WaterChargeProjectileEntity(Level world, Player player) {
         super(ModEntities.WATER_CHARGE, player, world, new ItemStack(ModItems.WATER_CHARGE), null);
 
-        this.setPosition(player.getX(), player.getEyeY() - 0.3, player.getZ());
+        this.setPos(player.getX(), player.getEyeY() - 0.3, player.getZ());
 
-        this.setPitch(player.getPitch());
-        this.setYaw(player.getYaw());
+        this.setXRot(player.getXRot());
+        this.setYRot(player.getYRot());
 
-        float pitch = player.getPitch() * 0.017453292F;
-        float yaw = player.getYaw() * 0.017453292F;
-        float x = -MathHelper.sin(yaw) * MathHelper.cos(pitch);
-        float y = -MathHelper.sin(pitch);
-        float z = MathHelper.cos(yaw) * MathHelper.cos(pitch);
-        initialDirection = new Vec3d(x, y, z).normalize();
+        float pitch = player.getXRot() * 0.017453292F;
+        float yaw = player.getYRot() * 0.017453292F;
+        float x = -Mth.sin(yaw) * Mth.cos(pitch);
+        float y = -Mth.sin(pitch);
+        float z = Mth.cos(yaw) * Mth.cos(pitch);
+        initialDirection = new Vec3(x, y, z).normalize();
 
         float speed = 1.5F;
-        this.setVelocity(x * speed, y * speed, z * speed);
+        this.setDeltaMovement(x * speed, y * speed, z * speed);
 
-        this.setNoClip(false);
-        this.setDamage(0);
+        this.setNoPhysics(false);
+        this.setBaseDamage(0);
         this.setNoGravity(false);
     }
 
-    public WaterChargeProjectileEntity(World world, double x, double y, double z, Vec3d vec3d) {
+    public WaterChargeProjectileEntity(Level world, double x, double y, double z, Vec3 vec3d) {
         super(ModEntities.WATER_CHARGE, world);
-        this.setPosition(x, y - 0.2, z);
+        this.setPos(x, y - 0.2, z);
         if (vec3d != null) {
-            this.setVelocity(vec3d);
+            this.setDeltaMovement(vec3d);
             initialDirection = vec3d.normalize();
         }
-        this.setNoClip(false);
-        this.setDamage(0);
+        this.setNoPhysics(false);
+        this.setBaseDamage(0);
         this.setNoGravity(false);
     }
 
     @Override
-    protected ItemStack getDefaultItemStack() {
+    protected ItemStack getDefaultPickupItem() {
         return new ItemStack(ModItems.WATER_CHARGE);
     }
 
@@ -121,15 +125,15 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     private boolean isReallyInWater() {
-        BlockPos pos = this.getBlockPos();
-        World world = this.getEntityWorld();
+        BlockPos pos = this.blockPosition();
+        Level world = this.level();
 
-        if (world.isWater(pos)) {
+        if (world.isWaterAt(pos)) {
             return true;
         }
 
         for (Direction dir : Direction.values()) {
-            if (world.isWater(pos.offset(dir))) {
+            if (world.isWaterAt(pos.relative(dir))) {
                 return true;
             }
         }
@@ -139,12 +143,12 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
 
 
     private void restoreOxygen(LivingEntity entity) {
-        if (!getEntityWorld().isClient() && entity instanceof PlayerEntity) {
-            ServerWorld serverWorld = (ServerWorld) getEntityWorld();
-            serverWorld.spawnParticles(
+        if (!level().isClientSide() && entity instanceof Player) {
+            ServerLevel serverWorld = (ServerLevel) level();
+            serverWorld.sendParticles(
                     ParticleTypes.BUBBLE,
                     entity.getX(),
-                    entity.getY() + entity.getHeight() * 0.5,
+                    entity.getY() + entity.getBbHeight() * 0.5,
                     entity.getZ(),
                     10,
                     0.3, 0.3, 0.3,
@@ -154,25 +158,25 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     private void createWaterExplosionEffects() {
-        World world = this.getEntityWorld();
-        Vec3d pos = this.getEntityPos();
+        Level world = this.level();
+        Vec3 pos = this.position();
 
         world.playSound(null, pos.x, pos.y, pos.z,
-                SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND,
-                SoundCategory.BLOCKS, 1.0F, 0.8F);
+                SoundEvents.POINTED_DRIPSTONE_LAND,
+                SoundSource.BLOCKS, 1.0F, 0.8F);
 
-        if (!world.isClient() && world instanceof ServerWorld serverWorld) {
+        if (!world.isClientSide() && world instanceof ServerLevel serverWorld) {
             DamageSource waterChargeDamage = new DamageSource(
-                    serverWorld.getRegistryManager()
-                            .getOrThrow(RegistryKeys.DAMAGE_TYPE)
-                            .getEntry(ModDamageTypes.WATER_CHARGE.getValue()).get(),
+                    serverWorld.registryAccess()
+                            .lookupOrThrow(Registries.DAMAGE_TYPE)
+                            .get(ModDamageTypes.WATER_CHARGE.identifier()).get(),
                     this,
                     this.getOwner()
             );
 
             ExplosionUtil.createSilentExplosion(
                     serverWorld,
-                    this.getEntityPos(),
+                    this.position(),
                     3.0f,
                     this,
                     null,
@@ -181,7 +185,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                     2.0f
             );
 
-            serverWorld.spawnParticles(
+            serverWorld.sendParticles(
                     ParticleTypes.BUBBLE,
                     pos.x, pos.y + 0.05, pos.z,
                     20,
@@ -194,7 +198,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 double distance = 0.2;
                 double offsetX = Math.cos(angle) * distance;
                 double offsetZ = Math.sin(angle) * distance;
-                serverWorld.spawnParticles(
+                serverWorld.sendParticles(
                         ParticleTypes.BUBBLE,
                         pos.x + offsetX, pos.y + 0.03, pos.z + offsetZ,
                         10,
@@ -208,7 +212,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 double distance = 0.1 + world.getRandom().nextDouble() * 0.25;
                 double offsetX = Math.cos(angle) * distance;
                 double offsetZ = Math.sin(angle) * distance;
-                serverWorld.spawnParticles(
+                serverWorld.sendParticles(
                         ParticleTypes.BUBBLE,
                         pos.x + offsetX * 0.3, pos.y + 0.05, pos.z + offsetZ * 0.3,
                         7,
@@ -217,21 +221,21 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 );
             }
 
-            if (world.isWater(this.getBlockPos())) {
-                serverWorld.spawnParticles(
+            if (world.isWaterAt(this.blockPosition())) {
+                serverWorld.sendParticles(
                         ParticleTypes.BUBBLE_COLUMN_UP,
                         pos.x, pos.y, pos.z,
                         17, 0.7, 0.7, 0.7, 0.2
                 );
 
-                serverWorld.spawnParticles(
+                serverWorld.sendParticles(
                         ParticleTypes.BUBBLE_POP,
                         pos.x, pos.y + 0.5, pos.z,
                         10, 1.2, 0.8, 1.2, 0.05
                 );
 
                 world.getServer().execute(() -> {
-                    serverWorld.spawnParticles(
+                    serverWorld.sendParticles(
                             ParticleTypes.BUBBLE,
                             pos.x, pos.y, pos.z,
                             15, 2.0, 1.2, 2.0, 0.05
@@ -241,7 +245,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
 
             float effectRadius = INDIRECT_KNOCKBACK_RADIUS * 1.2f;
 
-            Box affectBox = new Box(
+            AABB affectBox = new AABB(
                     pos.x - effectRadius - 0.5,
                     pos.y - effectRadius - 0.5,
                     pos.z - effectRadius - 0.5,
@@ -250,39 +254,39 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                     pos.z + effectRadius + 0.5
             );
 
-            List<Entity> nearbyEntities = world.getEntitiesByClass(Entity.class, affectBox, entity ->
+            List<Entity> nearbyEntities = world.getEntitiesOfClass(Entity.class, affectBox, entity ->
                     entity != this && entity != this.getOwner());
 
             for (Entity entity : nearbyEntities) {
-                double distance = entity.getEntityPos().distanceTo(pos);
+                double distance = entity.position().distanceTo(pos);
 
                 if (distance <= effectRadius) {
                     float distanceFactor = (float)(1.0 - distance / effectRadius);
                     float explosionFactor = (float)Math.pow(distanceFactor, 2.5) * EXPLOSION_KNOCKBACK_MULTIPLIER;
 
-                    Vec3d knockbackDir = entity.getEntityPos().subtract(pos).normalize();
+                    Vec3 knockbackDir = entity.position().subtract(pos).normalize();
                     float knockbackStrength = KNOCKBACK_STRENGTH * explosionFactor;
 
                     double upwardForce = 0.2 + (0.3 * explosionFactor);
 
-                    entity.addVelocity(
+                    entity.push(
                             knockbackDir.x * knockbackStrength,
                             knockbackDir.y * knockbackStrength + upwardForce,
                             knockbackDir.z * knockbackStrength
                     );
-                    entity.velocityDirty = true;
+                    entity.needsSync = true;
 
                     if (entity instanceof LivingEntity livingEntity) {
                         float damage = distanceFactor * EXPLOSION_DAMAGE_FACTOR * MAX_EXPLOSION_DAMAGE;
-                        if (damage > 0.5f && world instanceof ServerWorld) {
+                        if (damage > 0.5f && world instanceof ServerLevel) {
                             new DamageSource(
-                                    serverWorld.getRegistryManager()
-                                            .getOrThrow(RegistryKeys.DAMAGE_TYPE)
-                                            .getEntry(ModDamageTypes.WATER_CHARGE.getValue()).get(),
+                                    serverWorld.registryAccess()
+                                            .lookupOrThrow(Registries.DAMAGE_TYPE)
+                                            .get(ModDamageTypes.WATER_CHARGE.identifier()).get(),
                                     this,
                                     this.getOwner()
                             );
-                            livingEntity.damage(serverWorld, waterChargeDamage, damage);
+                            livingEntity.hurtServer(serverWorld, waterChargeDamage, damage);
                             restoreOxygen(livingEntity);
                         }
                     }
@@ -299,44 +303,44 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     private void createDirectHitEffect(Entity hitEntity) {
-        World world = this.getEntityWorld();
-        Vec3d pos = hitEntity.getEntityPos();
+        Level world = this.level();
+        Vec3 pos = hitEntity.position();
 
         world.playSound(null, pos.x, pos.y, pos.z,
-                SoundEvents.BLOCK_GILDED_BLACKSTONE_BREAK,
-                SoundCategory.NEUTRAL, 0.8F, 1.2F);
+                SoundEvents.GILDED_BLACKSTONE_BREAK,
+                SoundSource.NEUTRAL, 0.8F, 1.2F);
         world.playSound(null, pos.x, pos.y, pos.z,
-                SoundEvents.ENTITY_GENERIC_SPLASH,
-                SoundCategory.BLOCKS, 1.0F, 1.2F);
+                SoundEvents.GENERIC_SPLASH,
+                SoundSource.BLOCKS, 1.0F, 1.2F);
 
         if (hitEntity instanceof LivingEntity livingEntity) {
             float damage = DIRECT_DAMAGE;
-            if (world instanceof ServerWorld serverWorld) {
+            if (world instanceof ServerLevel serverWorld) {
                 DamageSource waterChargeDamage = new DamageSource(
-                        serverWorld.getRegistryManager()
-                                .getOrThrow(RegistryKeys.DAMAGE_TYPE)
-                                .getEntry(ModDamageTypes.WATER_CHARGE.getValue()).get(),
+                        serverWorld.registryAccess()
+                                .lookupOrThrow(Registries.DAMAGE_TYPE)
+                                .get(ModDamageTypes.WATER_CHARGE.identifier()).get(),
                         this,
                         this.getOwner()
                 );
-                livingEntity.damage(serverWorld, waterChargeDamage, damage);
+                livingEntity.hurtServer(serverWorld, waterChargeDamage, damage);
             }
 
             int durationTicks = (int)(WATER_BREATHING_DURATION * 20);
-            StatusEffectInstance breathEffect = new StatusEffectInstance(ModEffects.BREATH_GIVING, durationTicks, 1);
-            livingEntity.addStatusEffect(breathEffect);
+            MobEffectInstance breathEffect = new MobEffectInstance(ModEffects.BREATH_GIVING, durationTicks, 1);
+            livingEntity.addEffect(breathEffect);
 
             restoreOxygen(livingEntity);
         }
 
-        if (!world.isClient() && world instanceof ServerWorld serverWorld) {
-            float entityWidth = hitEntity.getWidth();
-            float entityHeight = hitEntity.getHeight();
+        if (!world.isClientSide() && world instanceof ServerLevel serverWorld) {
+            float entityWidth = hitEntity.getBbWidth();
+            float entityHeight = hitEntity.getBbHeight();
             float entitySize = (entityWidth + entityHeight) / 2.0f;
 
-            Vec3d explosionPos = exactHitPosition != null ? exactHitPosition : this.getEntityPos();
+            Vec3 explosionPos = exactHitPosition != null ? exactHitPosition : this.position();
 
-            serverWorld.spawnParticles(
+            serverWorld.sendParticles(
                     ParticleTypes.BUBBLE,
                     explosionPos.x, explosionPos.y + 0.05, explosionPos.z,
                     (int)(15 * Math.max(1.0f, entitySize)),
@@ -349,7 +353,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 double distance = 0.2 * Math.max(1.0f, entitySize);
                 double offsetX = Math.cos(angle) * distance;
                 double offsetZ = Math.sin(angle) * distance;
-                serverWorld.spawnParticles(
+                serverWorld.sendParticles(
                         ParticleTypes.BUBBLE,
                         explosionPos.x + offsetX, explosionPos.y + 0.03, explosionPos.z + offsetZ,
                         7,
@@ -366,16 +370,16 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     private void spawnBubbleParticles() {
-        World world = this.getEntityWorld();
+        Level world = this.level();
 
-        if (!world.isClient()) {
+        if (!world.isClientSide()) {
             return;
         }
 
         if (isDirectHit && attachedEntity != null) {
-            Vec3d entityPos = attachedEntity.getEntityPos();
-            float entityHeight = attachedEntity.getHeight();
-            float entityWidth = attachedEntity.getWidth();
+            Vec3 entityPos = attachedEntity.position();
+            float entityHeight = attachedEntity.getBbHeight();
+            float entityWidth = attachedEntity.getBbWidth();
 
             int spiralLayers = 3;
             float timeMultiplier = 0.1f;
@@ -384,7 +388,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 double spiralRadius = entityWidth * (1.2 + layer * 0.4);
                 double baseHeight = layer * entityHeight / (spiralLayers + 1);
                 float rotationDirection = (layer % 2 == 0) ? 1.0f : -1.0f;
-                double baseAngle = this.age * timeMultiplier * rotationDirection;
+                double baseAngle = this.tickCount * timeMultiplier * rotationDirection;
                 int spiralsPerLayer = 2;
                 for (int spiral = 0; spiral < spiralsPerLayer; spiral++) {
                     double spiralOffset = spiral * (Math.PI * 2.0 / spiralsPerLayer);
@@ -405,14 +409,14 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                         double velZ = -Math.sin(angle) * 0.1 * rotationDirection;
 
                         if (i % 2 == 0) {
-                            world.addParticleClient(
+                            world.addParticle(
                                     ParticleTypes.BUBBLE,
                                     posX, posY, posZ,
                                     velX, velY, velZ);
                         }
 
                         if (this.random.nextInt(15) == 0) {
-                            world.addParticleClient(
+                            world.addParticle(
                                     ParticleTypes.BUBBLE_POP,
                                     posX, posY + 0.2, posZ,
                                     velX * 1.5, velY * 1.5, velZ * 1.5);
@@ -421,7 +425,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 }
             }
         } else {
-            Vec3d pos = exactHitPosition != null ? exactHitPosition : this.getEntityPos();
+            Vec3 pos = exactHitPosition != null ? exactHitPosition : this.position();
             float explosionProgress = 1.0f - ((float)bubbleEffectTimer / BUBBLE_EFFECT_DURATION);
 
             if (bubbleEffectTimer > BUBBLE_EFFECT_DURATION * 0.3) {
@@ -431,7 +435,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                     double randZ = (this.random.nextDouble() - 0.5) * explosionProgress * 6.0;
 
                     if (this.random.nextInt(2) == 0) {
-                        world.addParticleClient(
+                        world.addParticle(
                                 ParticleTypes.BUBBLE_POP,
                                 pos.x + randX * 0.5,
                                 pos.y + randY * 0.5,
@@ -451,7 +455,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 double baseHeight = -1.0 + layer * 0.7;
                 double heightRange = 2.0 + layer * 0.3;
 
-                double baseAngle = this.age * (0.05 + layer * 0.02) * (layer % 2 == 0 ? 1 : -1);
+                double baseAngle = this.tickCount * (0.05 + layer * 0.02) * (layer % 2 == 0 ? 1 : -1);
 
                 int spiralsPerLayer = 1 + layer;
                 for (int spiral = 0; spiral < spiralsPerLayer; spiral++) {
@@ -481,7 +485,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                         double randZ = (this.random.nextDouble() - 0.5) * rand;
 
                         if (i % 2 == 0) {
-                            world.addParticleClient(
+                            world.addParticle(
                                     ParticleTypes.BUBBLE,
                                     pos.x + offsetX + randX,
                                     pos.y + offsetY + randY,
@@ -490,7 +494,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                         }
 
                         if (this.random.nextInt(20) == 0) {
-                            world.addParticleClient(
+                            world.addParticle(
                                     ParticleTypes.BUBBLE_POP,
                                     pos.x + offsetX + randX,
                                     pos.y + offsetY + randY + 0.2,
@@ -504,7 +508,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    protected void onEntityHit(EntityHitResult entityHitResult) {
+    protected void onHitEntity(EntityHitResult entityHitResult) {
         Entity entity = entityHitResult.getEntity();
 
         if (entity instanceof ItemEntity || !entity.isAlive()) {
@@ -516,59 +520,59 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
             return;
         }
 
-        this.exactHitPosition = entityHitResult.getPos();
+        this.exactHitPosition = entityHitResult.getLocation();
 
         if (entity instanceof LivingEntity livingEntity) {
-            if (getEntityWorld() instanceof ServerWorld serverWorld) {
+            if (level() instanceof ServerLevel serverWorld) {
                 DamageSource waterChargeDamage = new DamageSource(
-                        serverWorld.getRegistryManager()
-                                .getOrThrow(RegistryKeys.DAMAGE_TYPE)
-                                .getEntry(ModDamageTypes.WATER_CHARGE.getValue()).get(),
+                        serverWorld.registryAccess()
+                                .lookupOrThrow(Registries.DAMAGE_TYPE)
+                                .get(ModDamageTypes.WATER_CHARGE.identifier()).get(),
                         this,
                         this.getOwner()
                 );
-                livingEntity.damage(serverWorld, waterChargeDamage, DIRECT_DAMAGE);
+                livingEntity.hurtServer(serverWorld, waterChargeDamage, DIRECT_DAMAGE);
             }
 
             int durationTicks = (int)(WATER_BREATHING_DURATION * 20);
-            StatusEffectInstance breathEffect = new StatusEffectInstance(ModEffects.BREATH_GIVING, durationTicks, 1);
-            livingEntity.addStatusEffect(breathEffect);
+            MobEffectInstance breathEffect = new MobEffectInstance(ModEffects.BREATH_GIVING, durationTicks, 1);
+            livingEntity.addEffect(breathEffect);
 
             restoreOxygen(livingEntity);
         }
 
         createWaterExplosionEffects();
 
-        this.getEntityWorld().playSound(null, this.getX(), this.getY(), this.getZ(),
-                SoundEvents.BLOCK_GILDED_BLACKSTONE_BREAK, SoundCategory.BLOCKS, 1.0F, 1.2F);
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.GILDED_BLACKSTONE_BREAK, SoundSource.BLOCKS, 1.0F, 1.2F);
     }
 
     @Override
-    protected void onBlockHit(BlockHitResult result) {
-        super.onBlockHit(result);
+    protected void onHitBlock(BlockHitResult result) {
+        super.onHitBlock(result);
 
         if (!isReallyInWater()) {
             spawnAsItem();
             return;
         }
 
-        Vec3d hitPos = result.getPos();
-        Direction face = result.getSide();
+        Vec3 hitPos = result.getLocation();
+        Direction face = result.getDirection();
         double embedOffset = 0.05;
 
-        Vec3d embeddedPos = hitPos.add(
-                face.getOffsetX() * embedOffset,
-                face.getOffsetY() * embedOffset,
-                face.getOffsetZ() * embedOffset
+        Vec3 embeddedPos = hitPos.add(
+                face.getStepX() * embedOffset,
+                face.getStepY() * embedOffset,
+                face.getStepZ() * embedOffset
         );
 
-        this.setPos(embeddedPos.x, embeddedPos.y, embeddedPos.z);
-        this.setVelocity(Vec3d.ZERO);
+        this.setPosRaw(embeddedPos.x, embeddedPos.y, embeddedPos.z);
+        this.setDeltaMovement(Vec3.ZERO);
         this.setNoGravity(true);
 
-        this.setYaw(0.0F);
-        this.setPitch(0.0F);
-        this.setHeadYaw(0.0F);;
+        this.setYRot(0.0F);
+        this.setXRot(0.0F);
+        this.setYHeadRot(0.0F);;
 
         this.exactHitPosition = embeddedPos;
         this.attachedBlock = result.getBlockPos();
@@ -576,29 +580,28 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
         this.isStuck = true;
         this.stuckTicks = 0;
 
-        this.getEntityWorld().playSound(null, this.getX(), this.getY(), this.getZ(),
-                SoundEvents.BLOCK_GILDED_BLACKSTONE_BREAK,
-                SoundCategory.NEUTRAL, 1.0F, 1.2F);
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.GILDED_BLACKSTONE_BREAK,
+                SoundSource.NEUTRAL, 1.0F, 1.2F);
     }
 
     public boolean canBeCollidedWith() {
         return true;
     }
 
-    @Override
-    public ActionResult interact(PlayerEntity player, Hand hand) {
-        return ActionResult.PASS;
+    public InteractionResult interact(Player player, InteractionHand hand) {
+        return InteractionResult.PASS;
     }
 
     @Override
-    public void onPlayerCollision(PlayerEntity player) {
+    public void playerTouch(Player player) {
     }
 
-    public PersistentProjectileEntity.PickupPermission getPickupType() {
+    public AbstractArrow.Pickup getPickupType() {
         if (isStuck && isReallyInWater()) {
-            return PersistentProjectileEntity.PickupPermission.DISALLOWED;
+            return AbstractArrow.Pickup.DISALLOWED;
         } else {
-            return PersistentProjectileEntity.PickupPermission.ALLOWED;
+            return AbstractArrow.Pickup.ALLOWED;
         }
     }
 
@@ -619,14 +622,14 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
         if (isStuck && stuckTicks >= 0 && !isPerformingBubbleEffect) {
             stuckTicks++;
 
-            if (stuckTicks > 20 && this.getEntityWorld().isClient()) {
+            if (stuckTicks > 20 && this.level().isClientSide()) {
                 int particleChance = stuckTicks > 35 ? 1 : (stuckTicks > 30 ? 2 : 3);
 
                 if (this.random.nextInt(particleChance) == 0) {
-                    Vec3d pos = this.getEntityPos();
+                    Vec3 pos = this.position();
                     double spreadFactor = 0.1;
 
-                    this.getEntityWorld().addParticleClient(
+                    this.level().addParticle(
                             ParticleTypes.BUBBLE,
                             pos.x + (this.random.nextDouble() - 0.5) * spreadFactor,
                             pos.y + (this.random.nextDouble() - 0.5) * spreadFactor,
@@ -643,7 +646,7 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
 
                 createWaterShockwave();
 
-                if (!getEntityWorld().isClient()) {
+                if (!level().isClientSide()) {
                     this.discard();
                 }
 
@@ -654,18 +657,18 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
         if (!isStuck) {
             super.tick();
 
-            if (this.isTouchingWater() && this.getEntityWorld().isClient()) {
-                Vec3d velocity = this.getVelocity();
+            if (this.isInWater() && this.level().isClientSide()) {
+                Vec3 velocity = this.getDeltaMovement();
                 double speed = velocity.length();
 
-                if (speed > 0.1 && this.age % 2 == 0) {
-                    Vec3d normalized = velocity.normalize();
-                    Vec3d bubblePos = this.getEntityPos().subtract(normalized.multiply(0.3));
+                if (speed > 0.1 && this.tickCount % 2 == 0) {
+                    Vec3 normalized = velocity.normalize();
+                    Vec3 bubblePos = this.position().subtract(normalized.scale(0.3));
 
                     double spreadFactor = 0.05;
 
                     for (int i = 0; i < 2; i++) {
-                        this.getEntityWorld().addParticleClient(
+                        this.level().addParticle(
                                 ParticleTypes.BUBBLE,
                                 bubblePos.x + (this.random.nextDouble() - 0.5) * spreadFactor,
                                 bubblePos.y + (this.random.nextDouble() - 0.5) * spreadFactor,
@@ -678,13 +681,13 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
                 }
             }
 
-            if (this.isTouchingWater()) {
-                Vec3d currentVelocity = this.getVelocity();
-                this.setVelocity(currentVelocity.multiply(1.2));
+            if (this.isInWater()) {
+                Vec3 currentVelocity = this.getDeltaMovement();
+                this.setDeltaMovement(currentVelocity.scale(1.2));
             }
 
             if (initialDirection == null) {
-                Vec3d velocity = this.getVelocity();
+                Vec3 velocity = this.getDeltaMovement();
                 double length = velocity.length();
                 if (length > 0.1) {
                     initialDirection = velocity.normalize();
@@ -694,8 +697,8 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    public void writeCustomData(WriteView nbt) {
-        super.writeCustomData(nbt);
+    public void addAdditionalSaveData(ValueOutput nbt) {
+        super.addAdditionalSaveData(nbt);
 
         nbt.putBoolean("IsStuck", isStuck);
         nbt.putInt("StuckTicks", stuckTicks);
@@ -724,52 +727,52 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    public void readCustomData(ReadView nbt) {
-        super.readCustomData(nbt);
+    public void readAdditionalSaveData(ValueInput nbt) {
+        super.readAdditionalSaveData(nbt);
 
-        isStuck = nbt.getBoolean("IsStuck", false);
-        stuckTicks = nbt.getInt("StuckTicks", 0);
+        isStuck = nbt.getBooleanOr("IsStuck", false);
+        stuckTicks = nbt.getIntOr("StuckTicks", 0);
 
-        int blockX = nbt.getInt("AttachedBlockX", Integer.MIN_VALUE);
+        int blockX = nbt.getIntOr("AttachedBlockX", Integer.MIN_VALUE);
         if (blockX != Integer.MIN_VALUE) {
-            int blockY = nbt.getInt("AttachedBlockY", 0);
-            int blockZ = nbt.getInt("AttachedBlockZ", 0);
+            int blockY = nbt.getIntOr("AttachedBlockY", 0);
+            int blockZ = nbt.getIntOr("AttachedBlockZ", 0);
             attachedBlock = new BlockPos(blockX, blockY, blockZ);
         }
 
-        int faceId = nbt.getInt("AttachedFace", -1);
+        int faceId = nbt.getIntOr("AttachedFace", -1);
         if (faceId != -1 && faceId < Direction.values().length) {
             attachedFace = Direction.values()[faceId];
         }
 
-        double hitX = nbt.getDouble("HitPosX", Double.NaN);
+        double hitX = nbt.getDoubleOr("HitPosX", Double.NaN);
         if (!Double.isNaN(hitX)) {
-            double hitY = nbt.getDouble("HitPosY", 0.0);
-            double hitZ = nbt.getDouble("HitPosZ", 0.0);
-            exactHitPosition = new Vec3d(hitX, hitY, hitZ);
+            double hitY = nbt.getDoubleOr("HitPosY", 0.0);
+            double hitZ = nbt.getDoubleOr("HitPosZ", 0.0);
+            exactHitPosition = new Vec3(hitX, hitY, hitZ);
         }
 
-        double dirX = nbt.getDouble("InitialDirX", Double.NaN);
+        double dirX = nbt.getDoubleOr("InitialDirX", Double.NaN);
         if (!Double.isNaN(dirX)) {
-            double dirY = nbt.getDouble("InitialDirY", 0.0);
-            double dirZ = nbt.getDouble("InitialDirZ", 0.0);
-            initialDirection = new Vec3d(dirX, dirY, dirZ);
+            double dirY = nbt.getDoubleOr("InitialDirY", 0.0);
+            double dirZ = nbt.getDoubleOr("InitialDirZ", 0.0);
+            initialDirection = new Vec3(dirX, dirY, dirZ);
         }
 
         this.setNoGravity(isStuck);
     }
 
     private void spawnAsItem() {
-        if (!this.getEntityWorld().isClient()) {
+        if (!this.level().isClientSide()) {
             ItemEntity itemEntity = new ItemEntity(
-                    this.getEntityWorld(),
+                    this.level(),
                     this.getX(), this.getY(), this.getZ(),
                     new ItemStack(ModItems.WATER_CHARGE)
             );
-            this.getEntityWorld().spawnEntity(itemEntity);
+            this.level().addFreshEntity(itemEntity);
 
             if (attachedEntity instanceof LivingEntity livingEntity && livingEntity.isAlive()) {
-                livingEntity.setStuckArrowCount(Math.max(0, livingEntity.getStuckArrowCount() - 1));
+                livingEntity.setArrowCount(Math.max(0, livingEntity.getArrowCount() - 1));
             }
 
             this.discard();
@@ -781,13 +784,13 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    protected float getDragInWater() {
+    protected float getWaterInertia() {
         return 0.99F;
     }
 
     @Override
-    public void setDamage(double damage) {
-        super.setDamage(0.0);
+    public void setBaseDamage(double damage) {
+        super.setBaseDamage(0.0);
     }
 
     public double getDamage() {
@@ -795,31 +798,31 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     public static void registerDispenserBehavior() {
-        DispenserBehavior behavior = new DispenserBehavior() {
+        DispenseItemBehavior behavior = new DispenseItemBehavior() {
             @Override
-            public ItemStack dispense(BlockPointer pointer, ItemStack stack) {
-                World world = pointer.world();
+            public ItemStack dispense(BlockSource pointer, ItemStack stack) {
+                Level world = pointer.level();
                 BlockPos pos = pointer.pos();
-                Direction direction = pointer.state().get(Properties.FACING);
+                Direction direction = pointer.state().getValue(BlockStateProperties.FACING);
 
-                double x = pos.getX() + 0.5 + direction.getOffsetX() * 0.5;
-                double y = pos.getY() + 0.5 + direction.getOffsetY() * 0.5;
-                double z = pos.getZ() + 0.5 + direction.getOffsetZ() * 0.5;
+                double x = pos.getX() + 0.5 + direction.getStepX() * 0.5;
+                double y = pos.getY() + 0.5 + direction.getStepY() * 0.5;
+                double z = pos.getZ() + 0.5 + direction.getStepZ() * 0.5;
 
                 float speed = 1.5f;
-                Vec3d velocity = new Vec3d(
-                        direction.getOffsetX() * speed,
-                        direction.getOffsetY() * speed,
-                        direction.getOffsetZ() * speed
+                Vec3 velocity = new Vec3(
+                        direction.getStepX() * speed,
+                        direction.getStepY() * speed,
+                        direction.getStepZ() * speed
                 );
 
                 WaterChargeProjectileEntity projectile = new WaterChargeProjectileEntity(
                         world, x, y, z, velocity
                 );
 
-                world.spawnEntity(projectile);
+                world.addFreshEntity(projectile);
 
-                stack.decrement(1);
+                stack.shrink(1);
                 return stack;
             }
         };
@@ -828,11 +831,11 @@ public class WaterChargeProjectileEntity extends PersistentProjectileEntity {
     }
 
     @Override
-    public void kill(ServerWorld serverWorld) {
-        if (!isPerformingBubbleEffect && !getEntityWorld().isClient()) {
-            Vec3d pos = this.getEntityPos();
+    public void kill(ServerLevel serverWorld) {
+        if (!isPerformingBubbleEffect && !level().isClientSide()) {
+            Vec3 pos = this.position();
 
-            serverWorld.spawnParticles(
+            serverWorld.sendParticles(
                     ParticleTypes.BUBBLE_COLUMN_UP,
                     pos.x, pos.y, pos.z,
                     20, 1.0, 1.0, 1.0, 0.2

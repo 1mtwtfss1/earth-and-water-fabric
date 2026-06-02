@@ -1,13 +1,13 @@
 package potatowolfie.earth_and_water.world.feature.custom;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.StructureWorldAccess;
-import net.minecraft.world.gen.feature.Feature;
-import net.minecraft.world.gen.feature.util.FeatureContext;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import potatowolfie.earth_and_water.block.ModBlocks;
 
 public class OxygenFeature extends Feature<OxygenFeatureConfig> {
@@ -17,10 +17,10 @@ public class OxygenFeature extends Feature<OxygenFeatureConfig> {
     }
 
     @Override
-    public boolean generate(FeatureContext<OxygenFeatureConfig> context) {
-        StructureWorldAccess world = context.getWorld();
-        BlockPos pos = context.getOrigin();
-        Random random = context.getRandom();
+    public boolean place(FeaturePlaceContext<OxygenFeatureConfig> context) {
+        WorldGenLevel world = context.level();
+        BlockPos pos = context.origin();
+        RandomSource random = context.random();
 
         BlockPos oceanFloor = findOceanFloorPosition(world, pos);
         if (oceanFloor == null) {
@@ -32,16 +32,16 @@ public class OxygenFeature extends Feature<OxygenFeatureConfig> {
         return true;
     }
 
-    private BlockPos findOceanFloorPosition(StructureWorldAccess world, BlockPos startPos) {
-        BlockPos.Mutable mutablePos = startPos.mutableCopy();
+    private BlockPos findOceanFloorPosition(WorldGenLevel world, BlockPos startPos) {
+        BlockPos.MutableBlockPos mutablePos = startPos.mutable();
 
-        while (mutablePos.getY() < 63 && !world.getBlockState(mutablePos).isOf(Blocks.WATER)) {
+        while (mutablePos.getY() < 63 && !world.getBlockState(mutablePos).is(Blocks.WATER)) {
             mutablePos.move(0, 1, 0);
         }
 
         boolean foundWater = false;
         for (int i = 0; i < 64; i++) {
-            if (world.getBlockState(mutablePos).isOf(Blocks.WATER)) {
+            if (world.getBlockState(mutablePos).is(Blocks.WATER)) {
                 foundWater = true;
                 break;
             }
@@ -52,12 +52,12 @@ public class OxygenFeature extends Feature<OxygenFeatureConfig> {
             return null;
         }
 
-        while (mutablePos.getY() > world.getBottomY()) {
-            BlockPos below = mutablePos.down();
+        while (mutablePos.getY() > world.getMinY()) {
+            BlockPos below = mutablePos.below();
             BlockState belowState = world.getBlockState(below);
 
-            if (!belowState.isOf(Blocks.WATER) && !belowState.isAir() &&
-                    world.getBlockState(mutablePos).isOf(Blocks.WATER)) {
+            if (!belowState.is(Blocks.WATER) && !belowState.isAir() &&
+                    world.getBlockState(mutablePos).is(Blocks.WATER)) {
 
                 if (hasKelpOrPlantsAbove(world, mutablePos)) {
                     return null;
@@ -71,37 +71,37 @@ public class OxygenFeature extends Feature<OxygenFeatureConfig> {
         return null;
     }
 
-    private boolean canReplaceBlock(StructureWorldAccess world, BlockPos pos) {
+    private boolean canReplaceBlock(WorldGenLevel world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
 
-        if (state.isOf(Blocks.SAND) ||
-                state.isOf(Blocks.GRAVEL) ||
-                state.isOf(Blocks.CLAY) ||
-                state.isOf(Blocks.DIRT) ||
-                state.isOf(Blocks.COARSE_DIRT)) {
+        if (state.is(Blocks.SAND) ||
+                state.is(Blocks.GRAVEL) ||
+                state.is(Blocks.CLAY) ||
+                state.is(Blocks.DIRT) ||
+                state.is(Blocks.COARSE_DIRT)) {
             return true;
         }
 
-        if (state.isOf(Blocks.STONE) ||
-                state.isOf(Blocks.DEEPSLATE) ||
-                state.isOf(Blocks.GRANITE) ||
-                state.isOf(Blocks.ANDESITE) ||
-                state.isOf(Blocks.DIORITE)) {
+        if (state.is(Blocks.STONE) ||
+                state.is(Blocks.DEEPSLATE) ||
+                state.is(Blocks.GRANITE) ||
+                state.is(Blocks.ANDESITE) ||
+                state.is(Blocks.DIORITE)) {
             return true;
         }
 
         return false;
     }
 
-    private boolean hasKelpOrPlantsAbove(StructureWorldAccess world, BlockPos oceanFloorWater) {
+    private boolean hasKelpOrPlantsAbove(WorldGenLevel world, BlockPos oceanFloorWater) {
         for (int i = 0; i < 10; i++) {
-            BlockPos checkPos = oceanFloorWater.up(i);
+            BlockPos checkPos = oceanFloorWater.above(i);
             BlockState state = world.getBlockState(checkPos);
 
-            if (state.isOf(Blocks.KELP) ||
-                    state.isOf(Blocks.KELP_PLANT) ||
-                    state.isOf(Blocks.SEAGRASS) ||
-                    state.isOf(Blocks.TALL_SEAGRASS)) {
+            if (state.is(Blocks.KELP) ||
+                    state.is(Blocks.KELP_PLANT) ||
+                    state.is(Blocks.SEAGRASS) ||
+                    state.is(Blocks.TALL_SEAGRASS)) {
                 return true;
             }
 
@@ -112,9 +112,9 @@ public class OxygenFeature extends Feature<OxygenFeatureConfig> {
         return false;
     }
 
-    private void generateCrossPattern(StructureWorldAccess world, BlockPos center) {
+    private void generateCrossPattern(WorldGenLevel world, BlockPos center) {
         if (canReplaceBlock(world, center)) {
-            world.setBlockState(center, ModBlocks.OXYGEN_BLOCK.getDefaultState(), 3);
+            world.setBlock(center, ModBlocks.OXYGEN_BLOCK.defaultBlockState(), 3);
         }
 
         BlockPos[] positions = {
@@ -126,7 +126,7 @@ public class OxygenFeature extends Feature<OxygenFeatureConfig> {
 
         for (BlockPos pos : positions) {
             if (canReplaceBlock(world, pos)) {
-                world.setBlockState(pos, ModBlocks.OXYGEN_BLOCK.getDefaultState(), 3);
+                world.setBlock(pos, ModBlocks.OXYGEN_BLOCK.defaultBlockState(), 3);
             }
         }
     }

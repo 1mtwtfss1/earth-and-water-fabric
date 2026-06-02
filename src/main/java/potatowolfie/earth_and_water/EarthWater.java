@@ -6,24 +6,24 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.DispenserBlock;
-import net.minecraft.entity.SpawnLocationTypes;
-import net.minecraft.entity.SpawnRestriction;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ProjectileItem;
-import net.minecraft.particle.SimpleParticleType;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Position;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.core.Registry;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.SpawnPlacementTypes;
+import net.minecraft.world.entity.SpawnPlacements;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ProjectileItem;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import potatowolfie.earth_and_water.block.ModBlocks;
@@ -63,28 +63,21 @@ public class EarthWater implements ModInitializer {
 		ModLootTableModifier.modifyLootTables();
 		registerChunkLoadEvent();
 
-		Registry.register(Registries.PARTICLE_TYPE, Identifier.of(MOD_ID, "light_up"), LIGHT_UP);
-		Registry.register(Registries.PARTICLE_TYPE, Identifier.of(MOD_ID, "reinforced_spawner_detection"), REINFORCED_SPAWNER_DETECTION);
-		Registry.register(Registries.PARTICLE_TYPE, Identifier.of(MOD_ID, "reinforced_spawner_detection_outward"), REINFORCED_SPAWNER_DETECTION_OUTWARD);
-		Registry.register(Registries.PARTICLE_TYPE, Identifier.of(MOD_ID, "reinforced_spawner_detection_inner"), REINFORCED_SPAWNER_DETECTION_INNER);
+		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "light_up"), LIGHT_UP);
+		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "reinforced_spawner_detection"), REINFORCED_SPAWNER_DETECTION);
+		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "reinforced_spawner_detection_outward"), REINFORCED_SPAWNER_DETECTION_OUTWARD);
+		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "reinforced_spawner_detection_inner"), REINFORCED_SPAWNER_DETECTION_INNER);
 
 		registerDispenserBehaviors();
 
 		FabricDefaultAttributeRegistry.register(ModEntities.BORE, BoreEntity.createBoreAttributes());
 		FabricDefaultAttributeRegistry.register(ModEntities.BRINE, BrineEntity.createBrineAttributes());
 
-		SpawnRestriction.register(
-				ModEntities.BRINE,
-				SpawnLocationTypes.IN_WATER,
-				Heightmap.Type.OCEAN_FLOOR,
-				BrineEntity::canSpawn
-		);
-
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-			server.getOverworld().scheduleBlockTick(BlockPos.ORIGIN, Blocks.CAULDRON, 1);
-			server.getOverworld().scheduleBlockTick(BlockPos.ORIGIN, Blocks.LAVA_CAULDRON, 1);
-			server.getOverworld().scheduleBlockTick(BlockPos.ORIGIN, Blocks.WATER_CAULDRON, 1);
-			server.getOverworld().scheduleBlockTick(BlockPos.ORIGIN, Blocks.POWDER_SNOW_CAULDRON, 1);
+			server.overworld().scheduleTick(BlockPos.ZERO, Blocks.CAULDRON, 1);
+			server.overworld().scheduleTick(BlockPos.ZERO, Blocks.LAVA_CAULDRON, 1);
+			server.overworld().scheduleTick(BlockPos.ZERO, Blocks.WATER_CAULDRON, 1);
+			server.overworld().scheduleTick(BlockPos.ZERO, Blocks.POWDER_SNOW_CAULDRON, 1);
 		});
 
 		LOGGER.info("Earth and Water mod initialized!");
@@ -96,21 +89,21 @@ public class EarthWater implements ModInitializer {
 	}
 
 	private void registerChunkLoadEvent() {
-		ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
+		ServerChunkEvents.CHUNK_LOAD.register((world, chunk, generated) -> {
 			scheduleBlockTicksForChunk(world, chunk);
 		});
 	}
 
-	private void scheduleBlockTicksForChunk(ServerWorld world, WorldChunk chunk) {
-		BlockPos.Mutable pos = new BlockPos.Mutable();
+	private void scheduleBlockTicksForChunk(ServerLevel world, LevelChunk chunk) {
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 
 		for (int x = 0; x < 16; x++) {
 			for (int z = 0; z < 16; z++) {
-				int minY = world.getBottomY();
+				int minY = world.getMinY();
 				int maxY = minY + world.getHeight();
 
 				for (int y = minY; y < maxY; y++) {
-					pos.set(chunk.getPos().getStartX() + x, y, chunk.getPos().getStartZ() + z);
+					pos.set(chunk.getPos().getMinBlockX() + x, y, chunk.getPos().getMinBlockZ() + z);
 					var state = chunk.getBlockState(pos);
 					var block = state.getBlock();
 
@@ -120,7 +113,7 @@ public class EarthWater implements ModInitializer {
 							block == ModBlocks.CHISELED_DRIPSTONE_BRICKS ||
 							block == ModBlocks.REINFORCED_SPAWNER) {
 
-						world.scheduleBlockTick(pos.toImmutable(), block, 2);
+						world.scheduleTick(pos.immutable(), block, 2);
 					}
 				}
 			}
@@ -131,23 +124,23 @@ public class EarthWater implements ModInitializer {
 		DispenserBlock.registerBehavior(
 				item,
 				(pointer, stack) -> {
-					World world = pointer.world();
-					Position position = DispenserBlock.getOutputLocation(pointer);
-					Direction direction = pointer.state().get(DispenserBlock.FACING);
+					Level world = pointer.level();
+					Position position = DispenserBlock.getDispensePosition(pointer);
+					Direction direction = pointer.state().getValue(DispenserBlock.FACING);
 
 					ProjectileItem projectileItem = (ProjectileItem) stack.getItem();
-					ProjectileEntity projectileEntity = projectileItem.createEntity(world, position, stack, direction);
+					Projectile projectileEntity = projectileItem.asProjectile(world, position, stack, direction);
 
-					projectileEntity.setVelocity(
-							direction.getOffsetX(),
-							direction.getOffsetY() + 0.1F,
-							direction.getOffsetZ(),
+					projectileEntity.shoot(
+							direction.getStepX(),
+							direction.getStepY() + 0.1F,
+							direction.getStepZ(),
 							1.5F,
 							0.1F
 					);
 
-					world.spawnEntity(projectileEntity);
-					stack.decrement(1);
+					world.addFreshEntity(projectileEntity);
+					stack.shrink(1);
 					return stack;
 				}
 		);

@@ -1,31 +1,28 @@
 package potatowolfie.earth_and_water.item.custom;
 
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.TooltipDisplayComponent;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.item.*;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.DyeColor;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
 import potatowolfie.earth_and_water.damage.ModDamageTypes;
-
-import java.util.List;
-import java.util.function.Consumer;
 
 public class SpikedShieldItem extends ShieldItem {
 
-    public SpikedShieldItem(Item.Settings settings) {
+    public SpikedShieldItem(Item.Properties settings) {
         super(settings);
     }
 
-    public Text getName(ItemStack stack) {
-        DyeColor dyeColor = (DyeColor)stack.get(DataComponentTypes.BASE_COLOR);
+    public Component getName(ItemStack stack) {
+        DyeColor dyeColor = (DyeColor)stack.get(DataComponents.BASE_COLOR);
         if (dyeColor != null) {
-            String var10000 = this.translationKey;
-            return Text.translatable(var10000 + "." + dyeColor.getId());
+            String var10000 = this.descriptionId;
+            return Component.translatable(var10000 + "." + dyeColor.getName());
         } else {
             return super.getName(stack);
         }
@@ -40,14 +37,14 @@ public class SpikedShieldItem extends ShieldItem {
             LivingEntity attacker = getActualAttacker(damageSource);
 
             if (attacker != null && attacker != user) {
-                if (user.getEntityWorld() instanceof ServerWorld serverWorld) {
+                if (user.level() instanceof ServerLevel serverWorld) {
                     DamageSource spikedShieldDamage = new DamageSource(
-                            serverWorld.getRegistryManager()
-                                    .getOrThrow(RegistryKeys.DAMAGE_TYPE)
-                                    .getEntry(ModDamageTypes.SPIKED_SHIELD.getValue()).get(),
+                            serverWorld.registryAccess()
+                                    .lookupOrThrow(Registries.DAMAGE_TYPE)
+                                    .get(ModDamageTypes.SPIKED_SHIELD.identifier()).get(),
                             user
                     );
-                    attacker.damage(serverWorld, spikedShieldDamage, amount);
+                    attacker.hurtServer(serverWorld, spikedShieldDamage, amount);
                 }
 
                 return true;
@@ -60,13 +57,13 @@ public class SpikedShieldItem extends ShieldItem {
     }
 
     private boolean isExplosionDamage(DamageSource damageSource) {
-        if (damageSource.isOf(net.minecraft.entity.damage.DamageTypes.EXPLOSION) ||
-                damageSource.isOf(net.minecraft.entity.damage.DamageTypes.PLAYER_EXPLOSION)) {
+        if (damageSource.is(net.minecraft.world.damagesource.DamageTypes.EXPLOSION) ||
+                damageSource.is(net.minecraft.world.damagesource.DamageTypes.PLAYER_EXPLOSION)) {
             return true;
         }
 
-        if (damageSource.getSource() != null || damageSource.getAttacker() != null) {
-            String sourceName = damageSource.getName();
+        if (damageSource.getDirectEntity() != null || damageSource.getEntity() != null) {
+            String sourceName = damageSource.getMsgId();
             if (sourceName != null && sourceName.toLowerCase().contains("explosion")) {
                 return true;
             }
@@ -76,17 +73,17 @@ public class SpikedShieldItem extends ShieldItem {
     }
 
     private LivingEntity getActualAttacker(DamageSource damageSource) {
-        if (damageSource.getAttacker() instanceof LivingEntity livingAttacker) {
+        if (damageSource.getEntity() instanceof LivingEntity livingAttacker) {
             return livingAttacker;
         }
 
-        if (damageSource.getSource() instanceof LivingEntity livingSource) {
+        if (damageSource.getDirectEntity() instanceof LivingEntity livingSource) {
             return livingSource;
         }
 
-        if (damageSource.getSource() != null) {
-            var source = damageSource.getSource();
-            if (source instanceof net.minecraft.entity.projectile.ProjectileEntity projectile) {
+        if (damageSource.getDirectEntity() != null) {
+            var source = damageSource.getDirectEntity();
+            if (source instanceof net.minecraft.world.entity.projectile.Projectile projectile) {
                 if (projectile.getOwner() instanceof LivingEntity owner) {
                     return owner;
                 }

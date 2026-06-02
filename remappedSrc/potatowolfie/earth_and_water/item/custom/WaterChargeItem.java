@@ -1,38 +1,38 @@
 package potatowolfie.earth_and_water.item.custom;
 
-import net.minecraft.block.DispenserBlock;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ProjectileItem;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Position;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import potatowolfie.earth_and_water.entity.custom.WaterChargeProjectileEntity;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Position;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.stats.Stats;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ProjectileItem;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.phys.Vec3;
+import potatowolfie.earth_and_water.entity.water_charge.WaterChargeProjectileEntity;
 
 public class WaterChargeItem extends Item implements ProjectileItem {
     private static final int COOLDOWN = 100;
 
-    public WaterChargeItem(Item.Settings settings) {
+    public WaterChargeItem(Item.Properties settings) {
         super(settings);
     }
 
     @Override
-    public ActionResult use(World world, PlayerEntity user, Hand hand) {
-        if (!world.isClient()) {
+    public InteractionResult use(Level world, Player user, InteractionHand hand) {
+        if (!world.isClientSide()) {
             WaterChargeProjectileEntity waterChargeProjectileEntity = new WaterChargeProjectileEntity(world, user);
 
-            Vec3d lookVec = user.getRotationVec(1.0F);
+            Vec3 lookVec = user.getViewVector(1.0F);
 
             float speed = 2.0F;
-            waterChargeProjectileEntity.setVelocity(
+            waterChargeProjectileEntity.setDeltaMovement(
                     lookVec.x * speed,
                     lookVec.y * speed,
                     lookVec.z * speed
@@ -40,39 +40,39 @@ public class WaterChargeItem extends Item implements ProjectileItem {
 
             waterChargeProjectileEntity.setNoGravity(false);
 
-            world.spawnEntity(waterChargeProjectileEntity);
+            world.addFreshEntity(waterChargeProjectileEntity);
 
             world.playSound(
                     null,
                     user.getX(),
                     user.getY(),
                     user.getZ(),
-                    SoundEvents.ENTITY_WIND_CHARGE_THROW,
-                    SoundCategory.NEUTRAL,
+                    SoundEvents.WIND_CHARGE_THROW,
+                    SoundSource.NEUTRAL,
                     0.5F,
                     0.4F / (world.getRandom().nextFloat() * 0.4F + 0.8F)
             );
         }
 
-        ItemStack itemStack = user.getStackInHand(hand);
-        user.getItemCooldownManager().set(itemStack, COOLDOWN);
-        user.incrementStat(Stats.USED.getOrCreateStat(this));
-        itemStack.decrementUnlessCreative(1, user);
-        return ActionResult.SUCCESS;
+        ItemStack itemStack = user.getItemInHand(hand);
+        user.getCooldowns().addCooldown(itemStack, COOLDOWN);
+        user.awardStat(Stats.ITEM_USED.get(this));
+        itemStack.consume(1, user);
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    public ProjectileEntity createEntity(World world, Position pos, ItemStack stack, Direction direction) {
+    public Projectile asProjectile(Level world, Position pos, ItemStack stack, Direction direction) {
 
-        Vec3d dirVector = new Vec3d(direction.getOffsetX(), direction.getOffsetY(), direction.getOffsetZ());
+        Vec3 dirVector = new Vec3(direction.getStepX(), direction.getStepY(), direction.getStepZ());
         WaterChargeProjectileEntity waterChargeProjectileEntity = new WaterChargeProjectileEntity(
-                world, pos.getX(), pos.getY(), pos.getZ(), dirVector);
+                world, pos.x(), pos.y(), pos.z(), dirVector);
 
         float speed = 1.5F;
-        waterChargeProjectileEntity.setVelocity(
-                direction.getOffsetX() * speed,
-                direction.getOffsetY() * speed,
-                direction.getOffsetZ() * speed
+        waterChargeProjectileEntity.setDeltaMovement(
+                direction.getStepX() * speed,
+                direction.getStepY() * speed,
+                direction.getStepZ() * speed
         );
 
         waterChargeProjectileEntity.setNoGravity(false);
@@ -81,16 +81,16 @@ public class WaterChargeItem extends Item implements ProjectileItem {
     }
 
     @Override
-    public void initializeProjectile(ProjectileEntity entity, double x, double y, double z, float power, float uncertainty) {
-        entity.setVelocity(x, y, z, power, 0.1F);
+    public void shoot(Projectile entity, double x, double y, double z, float power, float uncertainty) {
+        entity.shoot(x, y, z, power, 0.1F);
 
         entity.setNoGravity(false);
     }
 
     @Override
-    public ProjectileItem.Settings getProjectileSettings() {
-        return ProjectileItem.Settings.builder()
-                .positionFunction((pointer, facing) -> DispenserBlock.getOutputLocation(pointer, 1.0, Vec3d.ZERO))
+    public ProjectileItem.DispenseConfig createDispenseConfig() {
+        return ProjectileItem.DispenseConfig.builder()
+                .positionFunction((pointer, facing) -> DispenserBlock.getDispensePosition(pointer, 1.0, Vec3.ZERO))
                 .uncertainty(0.1F)
                 .power(1.5F)
                 .overrideDispenseEvent(1051)

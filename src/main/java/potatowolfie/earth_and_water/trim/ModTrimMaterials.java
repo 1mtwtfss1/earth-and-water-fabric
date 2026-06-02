@@ -1,39 +1,40 @@
 package potatowolfie.earth_and_water.trim;
 
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ProvidesTrimMaterialComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.equipment.trim.ArmorTrimAssets;
-import net.minecraft.item.equipment.trim.ArmorTrimMaterial;
-import net.minecraft.registry.*;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Util;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.equipment.trim.MaterialAssetGroup;
+import net.minecraft.world.item.equipment.trim.TrimMaterial;
 import potatowolfie.earth_and_water.EarthWater;
 
 import java.util.Optional;
 
 public class ModTrimMaterials {
-    public static final RegistryKey<ArmorTrimMaterial> STEEL = RegistryKey.of(RegistryKeys.TRIM_MATERIAL,
-            Identifier.of(EarthWater.MOD_ID, "steel"));
+    public static final ResourceKey<TrimMaterial> STEEL = ResourceKey.create(Registries.TRIM_MATERIAL,
+            Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "steel"));
 
-    public static void bootstrap(Registerable<ArmorTrimMaterial> registry) {
+    public static void bootstrap(BootstrapContext<TrimMaterial> registry) {
         register(registry, STEEL, Style.EMPTY.withColor(11520457), ModTrimAssets.STEEL);
     }
 
-    public static Optional<RegistryEntry<ArmorTrimMaterial>> get(RegistryWrapper.WrapperLookup registries, ItemStack stack) {
-        ProvidesTrimMaterialComponent providesTrimMaterialComponent = (ProvidesTrimMaterialComponent)stack.get(DataComponentTypes.PROVIDES_TRIM_MATERIAL);
-        return providesTrimMaterialComponent != null ? providesTrimMaterialComponent.getMaterial(registries) : Optional.empty();
+    public static Optional<Holder<TrimMaterial>> get(ItemStack stack) {
+        Holder<TrimMaterial> material = stack.get(DataComponents.PROVIDES_TRIM_MATERIAL);
+        return material != null ? Optional.of(material) : Optional.empty();
     }
 
-    private static void register(Registerable<ArmorTrimMaterial> registry, RegistryKey<ArmorTrimMaterial> key, Style style, ArmorTrimAssets assets) {
-        Text text = Text.translatable(Util.createTranslationKey("trim_material", key.getValue())).fillStyle(style);
-        registry.register(key, new ArmorTrimMaterial(assets, text));
+    private static void register(BootstrapContext<TrimMaterial> registry, ResourceKey<TrimMaterial> key, Style style, MaterialAssetGroup assets) {
+        Component text = Component.translatable(Util.makeDescriptionId("trim_material", key.identifier())).withStyle(style);
+        registry.register(key, new TrimMaterial(assets, text));
     }
 
-    private static RegistryKey<ArmorTrimMaterial> of(String id) {
-        return RegistryKey.of(RegistryKeys.TRIM_MATERIAL, Identifier.ofVanilla(id));
+    private static ResourceKey<TrimMaterial> of(String id) {
+        return ResourceKey.create(Registries.TRIM_MATERIAL, Identifier.withDefaultNamespace(id));
     }
 }

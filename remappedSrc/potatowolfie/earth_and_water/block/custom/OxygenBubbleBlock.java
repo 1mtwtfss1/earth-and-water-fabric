@@ -2,95 +2,98 @@ package potatowolfie.earth_and_water.block.custom;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.block.*;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityCollisionHandler;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.fluid.Fluids;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.BooleanProperty;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.BlockView;
-import net.minecraft.world.World;
-import net.minecraft.world.WorldAccess;
-import net.minecraft.world.WorldView;
-import net.minecraft.world.tick.ScheduledTickView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SimpleWaterloggedBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
-public class OxygenBubbleBlock extends Block implements Waterloggable {
-    public static final MapCodec<OxygenBubbleBlock> CODEC = createCodec(OxygenBubbleBlock::new);
-    public static final BooleanProperty WATERLOGGED = Properties.WATERLOGGED;
+public class OxygenBubbleBlock extends Block implements SimpleWaterloggedBlock {
+    public static final MapCodec<OxygenBubbleBlock> CODEC = simpleCodec(OxygenBubbleBlock::new);
+    public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
     private static final int SCHEDULED_TICK_DELAY = 2;
 
-    public OxygenBubbleBlock(Settings settings) {
+    public OxygenBubbleBlock(Properties settings) {
         super(settings);
-        setDefaultState(getDefaultState().with(WATERLOGGED, true));
+        registerDefaultState(defaultBlockState().setValue(WATERLOGGED, true));
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(WATERLOGGED);
     }
 
     @Override
-    public MapCodec<OxygenBubbleBlock> getCodec() {
+    public MapCodec<OxygenBubbleBlock> codec() {
         return CODEC;
     }
 
     @Override
-    public VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return VoxelShapes.empty();
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+        return Shapes.empty();
     }
 
     @Override
-    public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return VoxelShapes.empty();
+    public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+        return Shapes.empty();
     }
 
-    public boolean isTransparent(BlockState state, BlockView world, BlockPos pos) {
+    public boolean isTransparent(BlockState state, BlockGetter world, BlockPos pos) {
         return true;
     }
 
     @Override
-    public float getAmbientOcclusionLightLevel(BlockState state, BlockView world, BlockPos pos) {
+    public float getShadeBrightness(BlockState state, BlockGetter world, BlockPos pos) {
         return 1.0F;
     }
 
     @Override
-    public void onEntityCollision(BlockState state, World world, BlockPos pos, Entity entity, EntityCollisionHandler entityCollisionHandler) {
-        if (!world.isClient && entity instanceof LivingEntity living && state.get(WATERLOGGED)) {
-            if (living.isSubmergedInWater()) {
-                int currentAir = living.getAir();
-                int maxAir = living.getMaxAir();
+    protected void entityInside(BlockState state, Level world, BlockPos pos, Entity entity, InsideBlockEffectApplier handler, boolean bl) {
+        if (!world.isClientSide() && entity instanceof LivingEntity living && state.getValue(WATERLOGGED)) {
+            if (living.isUnderWater()) {
+                int currentAir = living.getAirSupply();
+                int maxAir = living.getMaxAirSupply();
                 if (currentAir < maxAir) {
-                    living.setAir(Math.min(currentAir + 4, maxAir));
+                    living.setAirSupply(Math.min(currentAir + 4, maxAir));
                 }
             }
         }
     }
 
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        FluidState fluidState = ctx.getWorld().getFluidState(ctx.getBlockPos());
-        return getDefaultState().with(WATERLOGGED, fluidState.isOf(Fluids.WATER));
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        FluidState fluidState = ctx.getLevel().getFluidState(ctx.getClickedPos());
+        return defaultBlockState().setValue(WATERLOGGED, fluidState.is(Fluids.WATER));
     }
 
     @Override
-    public void scheduledTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
-        if (!state.get(WATERLOGGED)) {
+    public void tick(BlockState state, ServerLevel world, BlockPos pos, RandomSource random) {
+        if (!state.getValue(WATERLOGGED)) {
             world.removeBlock(pos, false);
             return;
         }
 
         boolean hasOxygenBelow = false;
         for (int y = 1; y <= 3; y++) {
-            BlockPos checkPos = pos.down(y);
+            BlockPos checkPos = pos.below(y);
             if (world.getBlockState(checkPos).getBlock() instanceof OxygenBlock) {
                 hasOxygenBelow = true;
                 break;
@@ -102,26 +105,26 @@ public class OxygenBubbleBlock extends Block implements Waterloggable {
             return;
         }
 
-        world.scheduleBlockTick(pos, this, SCHEDULED_TICK_DELAY);
+        world.scheduleTick(pos, this, SCHEDULED_TICK_DELAY);
     }
 
     @Override
-    public BlockState getStateForNeighborUpdate(BlockState state, WorldView world, ScheduledTickView tickView,
-                                                BlockPos pos, Direction direction, BlockPos neighborPos, BlockState neighborState, Random random) {
-        if (state.get(WATERLOGGED)) {
-            tickView.scheduleFluidTick(pos, Fluids.WATER, Fluids.WATER.getTickRate(world));
+    public BlockState updateShape(BlockState state, LevelReader world, ScheduledTickAccess tickView,
+                                                BlockPos pos, Direction direction, BlockPos neighborPos, BlockState neighborState, RandomSource random) {
+        if (state.getValue(WATERLOGGED)) {
+            tickView.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(world));
         }
-        tickView.scheduleBlockTick(pos, this, SCHEDULED_TICK_DELAY);
-        return super.getStateForNeighborUpdate(state, world, tickView, pos, direction, neighborPos, neighborState, random);
+        tickView.scheduleTick(pos, this, SCHEDULED_TICK_DELAY);
+        return super.updateShape(state, world, tickView, pos, direction, neighborPos, neighborState, random);
     }
 
     @Override
     public FluidState getFluidState(BlockState state) {
-        return state.get(WATERLOGGED) ? Fluids.WATER.getStill(false) : Fluids.EMPTY.getDefaultState();
+        return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : Fluids.EMPTY.defaultFluidState();
     }
 
     @Override
-    public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
+    public boolean canSurvive(BlockState state, LevelReader world, BlockPos pos) {
         return true;
     }
 }

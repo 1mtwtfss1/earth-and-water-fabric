@@ -1,9 +1,9 @@
 package potatowolfie.earth_and_water.sound;
 
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundEvent;
 import potatowolfie.earth_and_water.EarthWater;
 
 public class ModSounds {
@@ -17,8 +17,8 @@ public class ModSounds {
     public static final SoundEvent BRINE_UNDERWATER_DEATH = registerSoundEvent("brine_underwater_death");
 
     private static SoundEvent registerSoundEvent(String name) {
-        return Registry.register(Registries.SOUND_EVENT, Identifier.of(EarthWater.MOD_ID, name),
-                SoundEvent.of(Identifier.of(EarthWater.MOD_ID, name)));
+        return Registry.register(BuiltInRegistries.SOUND_EVENT, Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, name),
+                SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, name)));
     }
 
     public static void registerSounds() {

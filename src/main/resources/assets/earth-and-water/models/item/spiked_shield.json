@@ -3,7 +3,7 @@
 	"parent": "builtin/entity",
 	"gui_light": "front",
 	"textures": {
-		"1": "earth-and-water:entity/spiked_shield_base_nopattern",
+		"1": "earth-and-water:entity/shield/spiked_shield_base_nopattern",
 		"particle": "block/dark_oak_planks"
 	},
 	"components": {

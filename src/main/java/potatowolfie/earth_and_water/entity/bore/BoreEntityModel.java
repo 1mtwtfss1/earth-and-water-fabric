@@ -2,9 +2,15 @@ package potatowolfie.earth_and_water.entity.bore;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.animation.KeyframeAnimation;
 import net.minecraft.client.model.*;
-import net.minecraft.client.render.entity.animation.Animation;
-import net.minecraft.client.render.entity.model.EntityModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
+import net.minecraft.client.model.geom.builders.PartDefinition;
 import potatowolfie.earth_and_water.animation.BoreAnimations;
 
 // Made with Blockbench 4.12.4
@@ -15,11 +21,11 @@ public class BoreEntityModel extends EntityModel<BoreEntityRenderState> {
 	private final ModelPart eyes;
 	private final ModelPart rods_top;
 	private final ModelPart rods_bottom;
-	private final Animation idleAnimation;
-	private final Animation shootingAnimation;
-	private final Animation burrowingAnimation;
-	private final Animation unburrowingAnimation;
-	private final Animation whileburrowingAnimation;
+	private final KeyframeAnimation idleAnimation;
+	private final KeyframeAnimation shootingAnimation;
+	private final KeyframeAnimation burrowingAnimation;
+	private final KeyframeAnimation unburrowingAnimation;
+	private final KeyframeAnimation whileburrowingAnimation;
 
 	public BoreEntityModel(ModelPart modelPart) {
 		super(modelPart);
@@ -27,86 +33,86 @@ public class BoreEntityModel extends EntityModel<BoreEntityRenderState> {
 		this.eyes = this.head.getChild("eyes");
 		this.rods_top = modelPart.getChild("rods_top");
 		this.rods_bottom = modelPart.getChild("rods_bottom");
-		this.idleAnimation = BoreAnimations.BORE_IDLE.createAnimation(modelPart);
-		this.shootingAnimation = BoreAnimations.BORE_SHOOTING.createAnimation(modelPart);
-		this.burrowingAnimation = BoreAnimations.BORE_BURROWING.createAnimation(modelPart);
-		this.unburrowingAnimation = BoreAnimations.BORE_UNBURROWING.createAnimation(modelPart);
-		this.whileburrowingAnimation = BoreAnimations.BURROWING.createAnimation(modelPart);
+		this.idleAnimation = BoreAnimations.BORE_IDLE.bake(modelPart);
+		this.shootingAnimation = BoreAnimations.BORE_SHOOTING.bake(modelPart);
+		this.burrowingAnimation = BoreAnimations.BORE_BURROWING.bake(modelPart);
+		this.unburrowingAnimation = BoreAnimations.BORE_UNBURROWING.bake(modelPart);
+		this.whileburrowingAnimation = BoreAnimations.BURROWING.bake(modelPart);
 	}
 
-	public static TexturedModelData getTexturedModelData() {
-		ModelData modelData = new ModelData();
-		ModelPartData modelPartData = modelData.getRoot();
+	public static LayerDefinition getTexturedModelData() {
+		MeshDefinition modelData = new MeshDefinition();
+		PartDefinition modelPartData = modelData.getRoot();
 
-		ModelPartData head = modelPartData.addChild("head",
-				ModelPartBuilder.create().uv(0, 0)
-						.cuboid(-4.0F, -8.0F, -4.0F, 8.0F, 8.0F, 8.0F, new Dilation(0.0F)),
-				ModelTransform.origin(0.0F, 4.0F, 0.0F));
+		PartDefinition head = modelPartData.addOrReplaceChild("head",
+				CubeListBuilder.create().texOffs(0, 0)
+						.addBox(-4.0F, -8.0F, -4.0F, 8.0F, 8.0F, 8.0F, new CubeDeformation(0.0F)),
+				PartPose.offset(0.0F, 4.0F, 0.0F));
 
-		head.addChild("eyes",
-				ModelPartBuilder.create().uv(0, 0)
-						.cuboid(-4.0F, -8.0F, -4.0F, 8.0F, 8.0F, 8.0F, new Dilation(0.0F)),
-				ModelTransform.origin(0.0F, 0.0F, 0.0F));
+		head.addOrReplaceChild("eyes",
+				CubeListBuilder.create().texOffs(0, 0)
+						.addBox(-4.0F, -8.0F, -4.0F, 8.0F, 8.0F, 8.0F, new CubeDeformation(0.0F)),
+				PartPose.offset(0.0F, 0.0F, 0.0F));
 
-		ModelPartData cube_r1 = head.addChild("cube_r1",
-				ModelPartBuilder.create().uv(0, 9).cuboid(0.0F, -6.0F, -3.5F, 0.0F, 6.0F, 7.0F, new Dilation(0.0F)),
-				ModelTransform.of(0.0F, -8.0F, 0.0F, 0.0F, -2.3562F, 0.0F));
+		PartDefinition cube_r1 = head.addOrReplaceChild("cube_r1",
+				CubeListBuilder.create().texOffs(0, 9).addBox(0.0F, -6.0F, -3.5F, 0.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)),
+				PartPose.offsetAndRotation(0.0F, -8.0F, 0.0F, 0.0F, -2.3562F, 0.0F));
 
-		ModelPartData cube_r2 = head.addChild("cube_r2",
-				ModelPartBuilder.create().uv(0, 9).cuboid(0.0F, -6.0F, -3.5F, 0.0F, 6.0F, 7.0F, new Dilation(0.0F)),
-				ModelTransform.of(0.0F, -8.0F, 0.0F, 0.0F, -0.7854F, 0.0F));
+		PartDefinition cube_r2 = head.addOrReplaceChild("cube_r2",
+				CubeListBuilder.create().texOffs(0, 9).addBox(0.0F, -6.0F, -3.5F, 0.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)),
+				PartPose.offsetAndRotation(0.0F, -8.0F, 0.0F, 0.0F, -0.7854F, 0.0F));
 
-		ModelPartData rods_top = modelPartData.addChild("rods_top",
-				ModelPartBuilder.create(), ModelTransform.origin(0.0F, 7.0F, 0.0F));
+		PartDefinition rods_top = modelPartData.addOrReplaceChild("rods_top",
+				CubeListBuilder.create(), PartPose.offset(0.0F, 7.0F, 0.0F));
 
-		rods_top.addChild("rod1",
-				ModelPartBuilder.create().uv(14, 16)
-						.cuboid(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new Dilation(0.0F)),
-				ModelTransform.origin(-5.0F, 0.0F, -5.0F));
+		rods_top.addOrReplaceChild("rod1",
+				CubeListBuilder.create().texOffs(14, 16)
+						.addBox(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new CubeDeformation(0.0F)),
+				PartPose.offset(-5.0F, 0.0F, -5.0F));
 
-		rods_top.addChild("rod2",
-				ModelPartBuilder.create().uv(14, 16)
-						.cuboid(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new Dilation(0.0F)),
-				ModelTransform.origin(5.0F, 0.0F, -5.0F));
+		rods_top.addOrReplaceChild("rod2",
+				CubeListBuilder.create().texOffs(14, 16)
+						.addBox(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new CubeDeformation(0.0F)),
+				PartPose.offset(5.0F, 0.0F, -5.0F));
 
-		rods_top.addChild("rod3",
-				ModelPartBuilder.create().uv(14, 16)
-						.cuboid(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new Dilation(0.0F)),
-				ModelTransform.origin(5.0F, 0.0F, 5.0F));
+		rods_top.addOrReplaceChild("rod3",
+				CubeListBuilder.create().texOffs(14, 16)
+						.addBox(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new CubeDeformation(0.0F)),
+				PartPose.offset(5.0F, 0.0F, 5.0F));
 
-		rods_top.addChild("rod4",
-				ModelPartBuilder.create().uv(14, 16)
-						.cuboid(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new Dilation(0.0F)),
-				ModelTransform.origin(-5.0F, 0.0F, 5.0F));
+		rods_top.addOrReplaceChild("rod4",
+				CubeListBuilder.create().texOffs(14, 16)
+						.addBox(-1.0F, -4.0F, -1.0F, 2.0F, 8.0F, 2.0F, new CubeDeformation(0.0F)),
+				PartPose.offset(-5.0F, 0.0F, 5.0F));
 
-		ModelPartData rods_bottom = modelPartData.addChild("rods_bottom",
-				ModelPartBuilder.create(), ModelTransform.origin(0.0F, 11.0F, 0.0F));
+		PartDefinition rods_bottom = modelPartData.addOrReplaceChild("rods_bottom",
+				CubeListBuilder.create(), PartPose.offset(0.0F, 11.0F, 0.0F));
 
-		rods_bottom.addChild("rod_bottom1",
-				ModelPartBuilder.create().uv(0, 0)
-						.cuboid(-1.0F, 0.0F, -1.0F, 2.0F, 6.0F, 2.0F, new Dilation(0.0F))
-						.uv(0, 22).mirrored()
-						.cuboid(-2.0F, 6.0F, 0.0F, 3.0F, 4.0F, 0.0F, new Dilation(0.0F)).mirrored(false),
-				ModelTransform.of(2.5F, 0.0F, 0.0F, 0.0F, 0.0F, 0.1309F));
+		rods_bottom.addOrReplaceChild("rod_bottom1",
+				CubeListBuilder.create().texOffs(0, 0)
+						.addBox(-1.0F, 0.0F, -1.0F, 2.0F, 6.0F, 2.0F, new CubeDeformation(0.0F))
+						.texOffs(0, 22).mirror()
+						.addBox(-2.0F, 6.0F, 0.0F, 3.0F, 4.0F, 0.0F, new CubeDeformation(0.0F)).mirror(false),
+				PartPose.offsetAndRotation(2.5F, 0.0F, 0.0F, 0.0F, 0.0F, 0.1309F));
 
-		rods_bottom.addChild("rod_bottom2",
-				ModelPartBuilder.create().uv(0, 0)
-						.cuboid(-1.0F, 0.0F, -1.0F, 2.0F, 6.0F, 2.0F, new Dilation(0.0F))
-						.uv(0, 22)
-						.cuboid(-1.0F, 6.0F, 0.0F, 3.0F, 4.0F, 0.0F, new Dilation(0.0F)),
-				ModelTransform.of(-2.5F, 0.0F, 0.0F, -0.0078F, -0.0231F, -0.1285F));
+		rods_bottom.addOrReplaceChild("rod_bottom2",
+				CubeListBuilder.create().texOffs(0, 0)
+						.addBox(-1.0F, 0.0F, -1.0F, 2.0F, 6.0F, 2.0F, new CubeDeformation(0.0F))
+						.texOffs(0, 22)
+						.addBox(-1.0F, 6.0F, 0.0F, 3.0F, 4.0F, 0.0F, new CubeDeformation(0.0F)),
+				PartPose.offsetAndRotation(-2.5F, 0.0F, 0.0F, -0.0078F, -0.0231F, -0.1285F));
 
-		return TexturedModelData.of(modelData, 32, 32);
+		return LayerDefinition.create(modelData, 32, 32);
 	}
 
-	public void setAngles(BoreEntityRenderState boreEntityRenderState) {
-		super.setAngles(boreEntityRenderState);
+	public void setupAnim(BoreEntityRenderState boreEntityRenderState) {
+		super.setupAnim(boreEntityRenderState);
 
-		this.idleAnimation.apply(boreEntityRenderState.idleAnimationState, boreEntityRenderState.age);
-		this.shootingAnimation.apply(boreEntityRenderState.shootingAnimationState, boreEntityRenderState.age);
-		this.burrowingAnimation.apply(boreEntityRenderState.burrowingAnimationState, boreEntityRenderState.age);
-		this.unburrowingAnimation.apply(boreEntityRenderState.unburrowingAnimationState, boreEntityRenderState.age);
-		this.whileburrowingAnimation.apply(boreEntityRenderState.whileburrowingAnimationState, boreEntityRenderState.age);
+		this.idleAnimation.apply(boreEntityRenderState.idleAnimationState, boreEntityRenderState.ageInTicks);
+		this.shootingAnimation.apply(boreEntityRenderState.shootingAnimationState, boreEntityRenderState.ageInTicks);
+		this.burrowingAnimation.apply(boreEntityRenderState.burrowingAnimationState, boreEntityRenderState.ageInTicks);
+		this.unburrowingAnimation.apply(boreEntityRenderState.unburrowingAnimationState, boreEntityRenderState.ageInTicks);
+		this.whileburrowingAnimation.apply(boreEntityRenderState.whileburrowingAnimationState, boreEntityRenderState.ageInTicks);
 	}
 
 	public ModelPart getHead() {

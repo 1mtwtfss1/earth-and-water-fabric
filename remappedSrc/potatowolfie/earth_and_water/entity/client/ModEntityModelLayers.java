@@ -1,25 +1,25 @@
 package potatowolfie.earth_and_water.entity.client;
 
-import net.minecraft.client.render.entity.model.EntityModelLayer;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.resources.Identifier;
 import potatowolfie.earth_and_water.EarthWater;
 
 public class ModEntityModelLayers {
 
-    public static final EntityModelLayer EARTH_CHARGE =
-            new EntityModelLayer(Identifier.of(EarthWater.MOD_ID, "earth_charge"), "main");
+    public static final ModelLayerLocation EARTH_CHARGE =
+            new ModelLayerLocation(Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "earth_charge"), "main");
 
-    public static final EntityModelLayer WATER_CHARGE =
-            new EntityModelLayer(Identifier.of(EarthWater.MOD_ID, "water_charge"), "main");
+    public static final ModelLayerLocation WATER_CHARGE =
+            new ModelLayerLocation(Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "water_charge"), "main");
 
-    public static final EntityModelLayer BORE = new EntityModelLayer(
-            Identifier.of(EarthWater.MOD_ID, "bore"), "main"
+    public static final ModelLayerLocation BORE = new ModelLayerLocation(
+            Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "bore"), "main"
     );
 
-    public static final EntityModelLayer BRINE = new EntityModelLayer(
-            Identifier.of(EarthWater.MOD_ID, "brine"), "main"
+    public static final ModelLayerLocation BRINE = new ModelLayerLocation(
+            Identifier.fromNamespaceAndPath(EarthWater.MOD_ID, "brine"), "main"
     );
 
-    public static final EntityModelLayer SPIKED_SHIELD = new EntityModelLayer(
-            Identifier.of("earth-and-water", "spiked_shield"), "main");
+    public static final ModelLayerLocation SPIKED_SHIELD = new ModelLayerLocation(
+            Identifier.fromNamespaceAndPath("earth-and-water", "spiked_shield"), "main");
 }

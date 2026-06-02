@@ -1,9 +1,9 @@
 package potatowolfie.earth_and_water.item.custom;
 
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 public class ReinforcedKeyItem extends Item {
-    public ReinforcedKeyItem(Item.Settings settings) {
+    public ReinforcedKeyItem(Item.Properties settings) {
         super(settings);
     }
 }

@@ -1,54 +1,54 @@
 package potatowolfie.earth_and_water.block.custom;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.IntProperty;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 public class ChiseledDarkPrismarineBlock extends Block {
-    public static final IntProperty Y_LEVEL_STATE = IntProperty.of("y_level", 0, 3);
+    public static final IntegerProperty Y_LEVEL_STATE = IntegerProperty.create("y_level", 0, 3);
 
-    public ChiseledDarkPrismarineBlock(Settings settings) {
-        super(settings.luminance(state -> getLuminanceForState(state)));
-        this.setDefaultState(this.getStateManager().getDefaultState().with(Y_LEVEL_STATE, 0));
+    public ChiseledDarkPrismarineBlock(Properties settings) {
+        super(settings.lightLevel(state -> getLuminanceForState(state)));
+        this.registerDefaultState(this.getStateDefinition().any().setValue(Y_LEVEL_STATE, 0));
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(Y_LEVEL_STATE);
     }
 
     @Override
-    public void onBlockAdded(BlockState state, World world, BlockPos pos, BlockState oldState, boolean notify) {
-        if (!oldState.isOf(state.getBlock())) {
+    public void onPlace(BlockState state, Level world, BlockPos pos, BlockState oldState, boolean notify) {
+        if (!oldState.is(state.getBlock())) {
             int newState = getStateForYLevel(pos.getY());
-            if (newState != state.get(Y_LEVEL_STATE)) {
-                world.setBlockState(pos, state.with(Y_LEVEL_STATE, newState), Block.NOTIFY_ALL);
+            if (newState != state.getValue(Y_LEVEL_STATE)) {
+                world.setBlock(pos, state.setValue(Y_LEVEL_STATE, newState), Block.UPDATE_ALL);
             }
         }
     }
 
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        int newState = getStateForYLevel(ctx.getBlockPos().getY());
-        return this.getDefaultState().with(Y_LEVEL_STATE, newState);
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        int newState = getStateForYLevel(ctx.getClickedPos().getY());
+        return this.defaultBlockState().setValue(Y_LEVEL_STATE, newState);
     }
 
     @Override
-    public void onStateReplaced(BlockState state, ServerWorld world, BlockPos pos, boolean moved) {
-        super.onStateReplaced(state, world, pos, moved);
+    public void affectNeighborsAfterRemoval(BlockState state, ServerLevel world, BlockPos pos, boolean moved) {
+        super.affectNeighborsAfterRemoval(state, world, pos, moved);
     }
 
     @Override
-    public void scheduledTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
+    public void tick(BlockState state, ServerLevel world, BlockPos pos, RandomSource random) {
         int newState = getStateForYLevel(pos.getY());
-        if (newState != state.get(Y_LEVEL_STATE)) {
-            world.setBlockState(pos, state.with(Y_LEVEL_STATE, newState), Block.NOTIFY_ALL);
+        if (newState != state.getValue(Y_LEVEL_STATE)) {
+            world.setBlock(pos, state.setValue(Y_LEVEL_STATE, newState), Block.UPDATE_ALL);
         }
     }
 
@@ -65,8 +65,8 @@ public class ChiseledDarkPrismarineBlock extends Block {
     }
 
     private static int getLuminanceForState(BlockState state) {
-        if (state.contains(Y_LEVEL_STATE)) {
-            int yLevelState = state.get(Y_LEVEL_STATE);
+        if (state.hasProperty(Y_LEVEL_STATE)) {
+            int yLevelState = state.getValue(Y_LEVEL_STATE);
             switch (yLevelState) {
                 case 1: return 4;
                 case 2: return 8;

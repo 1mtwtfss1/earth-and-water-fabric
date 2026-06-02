@@ -1,22 +1,24 @@
 package potatowolfie.earth_and_water.item.custom;
 
-import net.minecraft.component.type.TooltipDisplayComponent;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.*;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.AxeItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ToolMaterial;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import potatowolfie.earth_and_water.damage.ModDamageTypes;
 import potatowolfie.earth_and_water.sound.ModSounds;
 
@@ -34,16 +36,16 @@ public class BattleAxeItem extends AxeItem {
     private static final float MAX_HORIZONTAL_MULTIPLIER = 1.414f;
     private static final float MAX_VERTICAL_MULTIPLIER = 0.5f;
 
-    public BattleAxeItem(ToolMaterial material, float attackDamage, float attackSpeed, Settings settings) {
+    public BattleAxeItem(ToolMaterial material, float attackDamage, float attackSpeed, Properties settings) {
         super(material, attackDamage, attackSpeed, settings);
     }
 
     @Override
-    public void postHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        super.postHit(stack, target, attacker);
+    public void hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        super.hurtEnemy(stack, target, attacker);
     }
 
-    private float calculateHorizontalAngleMultiplier(Vec3d lookVec) {
+    private float calculateHorizontalAngleMultiplier(Vec3 lookVec) {
         double horizontalMagnitude = Math.sqrt(lookVec.x * lookVec.x + lookVec.z * lookVec.z);
 
         if (horizontalMagnitude < 0.001) {
@@ -67,7 +69,7 @@ public class BattleAxeItem extends AxeItem {
         return (float) (1.0 + (MAX_HORIZONTAL_MULTIPLIER - 1.0) * normalizedDistance);
     }
 
-    private float calculateVerticalAngleMultiplier(Vec3d lookVec) {
+    private float calculateVerticalAngleMultiplier(Vec3 lookVec) {
         double horizontalMagnitude = Math.sqrt(lookVec.x * lookVec.x + lookVec.z * lookVec.z);
         double verticalComponent = lookVec.y;
         double pitchAngle = Math.atan2(Math.abs(verticalComponent), horizontalMagnitude) * 180.0 / Math.PI;
@@ -84,16 +86,16 @@ public class BattleAxeItem extends AxeItem {
     }
 
     @Override
-    public ActionResult use(World world, PlayerEntity player, Hand hand) {
-        ItemStack itemStack = player.getStackInHand(hand);
+    public InteractionResult use(Level world, Player player, InteractionHand hand) {
+        ItemStack itemStack = player.getItemInHand(hand);
 
-        if (player.getItemCooldownManager().isCoolingDown(itemStack)) {
-            return ActionResult.PASS;
+        if (player.getCooldowns().isOnCooldown(itemStack)) {
+            return InteractionResult.PASS;
         }
 
-        if (!world.isClient() && world instanceof ServerWorld serverWorld) {
-            Vec3d lookVec = player.getRotationVector();
-            boolean isInAir = !player.isOnGround();
+        if (!world.isClientSide() && world instanceof ServerLevel serverWorld) {
+            Vec3 lookVec = player.getLookAngle();
+            boolean isInAir = !player.onGround();
 
             float horizontalMultiplier = calculateHorizontalAngleMultiplier(lookVec);
             float verticalMultiplier = calculateVerticalAngleMultiplier(lookVec);
@@ -115,21 +117,21 @@ public class BattleAxeItem extends AxeItem {
                 verticalScalingFactor = (float) (1.0f - 0.3f * Math.max(0, lookVec.y));
             }
 
-            Vec3d dashVec = new Vec3d(
+            Vec3 dashVec = new Vec3(
                     lookVec.x * currentDashStrength,
                     lookVec.y * currentDashStrength * verticalScalingFactor,
                     lookVec.z * currentDashStrength
             );
 
-            player.setVelocity(dashVec);
-            player.velocityDirty = true;
-            if (player instanceof ServerPlayerEntity serverPlayer) {
-                serverPlayer.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(player));
+            player.setDeltaMovement(dashVec);
+            player.needsSync = true;
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.connection.send(new ClientboundSetEntityMotionPacket(player));
             }
 
-            Vec3d playerPos = player.getEntityPos();
-            Vec3d dashEnd = playerPos.add(dashVec.multiply(DASH_DISTANCE));
-            Box collisionBox = new Box(
+            Vec3 playerPos = player.position();
+            Vec3 dashEnd = playerPos.add(dashVec.scale(DASH_DISTANCE));
+            AABB collisionBox = new AABB(
                     Math.min(playerPos.x, dashEnd.x) - 1,
                     Math.min(playerPos.y, dashEnd.y) - 1,
                     Math.min(playerPos.z, dashEnd.z) - 1,
@@ -138,7 +140,7 @@ public class BattleAxeItem extends AxeItem {
                     Math.max(playerPos.z, dashEnd.z) + 1
             );
 
-            List<LivingEntity> entities = world.getEntitiesByClass(
+            List<LivingEntity> entities = world.getEntitiesOfClass(
                     LivingEntity.class,
                     collisionBox,
                     entity -> entity != player && !entity.isSpectator()
@@ -148,13 +150,13 @@ public class BattleAxeItem extends AxeItem {
 
             for (LivingEntity entity : entities) {
                 DamageSource battleAxeDamage = new DamageSource(
-                        world.getRegistryManager()
-                                .getOrThrow(RegistryKeys.DAMAGE_TYPE)
-                                .getEntry(ModDamageTypes.BATTLE_AXE.getValue()).get(),
+                        world.registryAccess()
+                                .lookupOrThrow(Registries.DAMAGE_TYPE)
+                                .get(ModDamageTypes.BATTLE_AXE.identifier()).get(),
                         player
                 );
-                entity.damage(serverWorld, battleAxeDamage, DASH_DAMAGE);
-                entity.takeKnockback(0.5, -lookVec.x, -lookVec.z);
+                entity.hurtServer(serverWorld, battleAxeDamage, DASH_DAMAGE);
+                entity.knockback(0.5, -lookVec.x, -lookVec.z);
                 hitAnyMob = true;
             }
 
@@ -162,23 +164,23 @@ public class BattleAxeItem extends AxeItem {
                     null,
                     player.getX(), player.getY(), player.getZ(),
                     ModSounds.BATTLE_AXE_DASH,
-                    SoundCategory.PLAYERS,
+                    SoundSource.PLAYERS,
                     0.5F,
                     1.0F
             );
 
-            int cooldown = player.getAbilities().creativeMode ? CREATIVE_DASH_COOLDOWN : DASH_COOLDOWN;
-            player.getItemCooldownManager().set(itemStack, cooldown);
+            int cooldown = player.getAbilities().instabuild ? CREATIVE_DASH_COOLDOWN : DASH_COOLDOWN;
+            player.getCooldowns().addCooldown(itemStack, cooldown);
         }
 
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    public void appendTooltip(ItemStack stack, TooltipContext context, TooltipDisplayComponent displayComponent, Consumer<Text> textConsumer, TooltipType type) {
-        textConsumer.accept(Text.translatable("tooltip.earth-and-water.tooltipempty"));
-        textConsumer.accept(Text.translatable("tooltip.earth-and-water.battle_axe.tooltip1"));
-        textConsumer.accept(Text.translatable("tooltip.earth-and-water.battle_axe.tooltip2"));
-        super.appendTooltip(stack, context, displayComponent, textConsumer, type);
+    public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay displayComponent, Consumer<Component> textConsumer, TooltipFlag type) {
+        textConsumer.accept(Component.translatable("tooltip.earth-and-water.tooltipempty"));
+        textConsumer.accept(Component.translatable("tooltip.earth-and-water.battle_axe.tooltip1"));
+        textConsumer.accept(Component.translatable("tooltip.earth-and-water.battle_axe.tooltip2"));
+        super.appendHoverText(stack, context, displayComponent, textConsumer, type);
     }
 }

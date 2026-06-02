@@ -1,50 +1,50 @@
 package potatowolfie.earth_and_water.world.feature.custom;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.floatprovider.ClampedNormalFloatProvider;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.StructureWorldAccess;
-import net.minecraft.world.WorldAccess;
-import net.minecraft.world.WorldView;
-import net.minecraft.world.gen.feature.Feature;
-import net.minecraft.world.gen.feature.util.CaveSurface;
-import net.minecraft.world.gen.feature.util.FeatureContext;
 import potatowolfie.earth_and_water.block.ModBlocks;
 
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.OptionalInt;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.valueproviders.ClampedNormalFloat;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Column;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 
 public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFeatureConfig> {
     public DarkDripstoneClusterFeature(Codec<DarkDripstoneClusterFeatureConfig> codec) {
         super(codec);
     }
 
-    public boolean generate(FeatureContext<DarkDripstoneClusterFeatureConfig> context) {
-        StructureWorldAccess structureWorldAccess = context.getWorld();
-        BlockPos blockPos = context.getOrigin();
-        DarkDripstoneClusterFeatureConfig DarkdripstoneClusterFeatureConfig = (DarkDripstoneClusterFeatureConfig)context.getConfig();
-        Random random = context.getRandom();
+    public boolean place(FeaturePlaceContext<DarkDripstoneClusterFeatureConfig> context) {
+        WorldGenLevel structureWorldAccess = context.level();
+        BlockPos blockPos = context.origin();
+        DarkDripstoneClusterFeatureConfig DarkdripstoneClusterFeatureConfig = (DarkDripstoneClusterFeatureConfig)context.config();
+        RandomSource random = context.random();
         if (!DarkDripstoneHelper.canGenerate(structureWorldAccess, blockPos)) {
             return false;
         } else {
-            int i = DarkdripstoneClusterFeatureConfig.height.get(random);
-            float f = DarkdripstoneClusterFeatureConfig.wetness.get(random);
-            float g = DarkdripstoneClusterFeatureConfig.density.get(random);
-            int j = DarkdripstoneClusterFeatureConfig.radius.get(random);
-            int k = DarkdripstoneClusterFeatureConfig.radius.get(random);
+            int i = DarkdripstoneClusterFeatureConfig.height.sample(random);
+            float f = DarkdripstoneClusterFeatureConfig.wetness.sample(random);
+            float g = DarkdripstoneClusterFeatureConfig.density.sample(random);
+            int j = DarkdripstoneClusterFeatureConfig.radius.sample(random);
+            int k = DarkdripstoneClusterFeatureConfig.radius.sample(random);
 
             for(int l = -j; l <= j; ++l) {
                 for(int m = -k; m <= k; ++m) {
                     double d = this.DarkdripstoneChance(j, k, l, m, DarkdripstoneClusterFeatureConfig);
-                    BlockPos blockPos2 = blockPos.add(l, 0, m);
+                    BlockPos blockPos2 = blockPos.offset(l, 0, m);
                     this.generate(structureWorldAccess, random, blockPos2, l, m, f, d, i, g, DarkdripstoneClusterFeatureConfig);
                 }
             }
@@ -53,29 +53,29 @@ public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFea
         }
     }
 
-    private void generate(StructureWorldAccess world, Random random, BlockPos pos, int localX, int localZ, float wetness, double DarkdripstoneChance, int height, float density, DarkDripstoneClusterFeatureConfig config) {
-        Optional<CaveSurface> optional = CaveSurface.create(world, pos, config.floorToCeilingSearchRange, DarkDripstoneHelper::canGenerate, DarkDripstoneHelper::cannotGenerate);
+    private void generate(WorldGenLevel world, RandomSource random, BlockPos pos, int localX, int localZ, float wetness, double DarkdripstoneChance, int height, float density, DarkDripstoneClusterFeatureConfig config) {
+        Optional<Column> optional = Column.scan(world, pos, config.floorToCeilingSearchRange, DarkDripstoneHelper::canGenerate, DarkDripstoneHelper::cannotGenerate);
         if (!optional.isEmpty()) {
-            OptionalInt optionalInt = ((CaveSurface)optional.get()).getCeilingHeight();
-            OptionalInt optionalInt2 = ((CaveSurface)optional.get()).getFloorHeight();
+            OptionalInt optionalInt = ((Column)optional.get()).getCeiling();
+            OptionalInt optionalInt2 = ((Column)optional.get()).getFloor();
             if (!optionalInt.isEmpty() || !optionalInt2.isEmpty()) {
                 boolean bl = random.nextFloat() < wetness;
-                CaveSurface caveSurface;
-                if (bl && optionalInt2.isPresent() && this.canWaterSpawn(world, pos.withY(optionalInt2.getAsInt()))) {
+                Column caveSurface;
+                if (bl && optionalInt2.isPresent() && this.canWaterSpawn(world, pos.atY(optionalInt2.getAsInt()))) {
                     int i = optionalInt2.getAsInt();
-                    caveSurface = ((CaveSurface)optional.get()).withFloor(OptionalInt.of(i - 1));
-                    world.setBlockState(pos.withY(i), Blocks.WATER.getDefaultState(), 2);
+                    caveSurface = ((Column)optional.get()).withFloor(OptionalInt.of(i - 1));
+                    world.setBlock(pos.atY(i), Blocks.WATER.defaultBlockState(), 2);
                 } else {
-                    caveSurface = (CaveSurface)optional.get();
+                    caveSurface = (Column)optional.get();
                 }
 
-                OptionalInt optionalInt3 = caveSurface.getFloorHeight();
+                OptionalInt optionalInt3 = caveSurface.getFloor();
                 boolean bl2 = random.nextDouble() < DarkdripstoneChance;
                 int l;
                 int j;
-                if (optionalInt.isPresent() && bl2 && !this.isLava(world, pos.withY(optionalInt.getAsInt()))) {
-                    j = config.dripstoneBlockLayerThickness.get(random);
-                    this.placeDarkDripstoneBlocks(world, pos.withY(optionalInt.getAsInt()), j, Direction.UP);
+                if (optionalInt.isPresent() && bl2 && !this.isLava(world, pos.atY(optionalInt.getAsInt()))) {
+                    j = config.dripstoneBlockLayerThickness.sample(random);
+                    this.placeDarkDripstoneBlocks(world, pos.atY(optionalInt.getAsInt()), j, Direction.UP);
                     int k;
                     if (optionalInt3.isPresent()) {
                         k = Math.min(height, optionalInt.getAsInt() - optionalInt3.getAsInt());
@@ -90,11 +90,11 @@ public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFea
 
                 boolean bl3 = random.nextDouble() < DarkdripstoneChance;
                 int m;
-                if (optionalInt3.isPresent() && bl3 && !this.isLava(world, pos.withY(optionalInt3.getAsInt()))) {
-                    m = config.dripstoneBlockLayerThickness.get(random);
-                    this.placeDarkDripstoneBlocks(world, pos.withY(optionalInt3.getAsInt()), m, Direction.DOWN);
+                if (optionalInt3.isPresent() && bl3 && !this.isLava(world, pos.atY(optionalInt3.getAsInt()))) {
+                    m = config.dripstoneBlockLayerThickness.sample(random);
+                    this.placeDarkDripstoneBlocks(world, pos.atY(optionalInt3.getAsInt()), m, Direction.DOWN);
                     if (optionalInt.isPresent()) {
-                        j = Math.max(0, l + MathHelper.nextBetween(random, -config.maxStalagmiteStalactiteHeightDiff, config.maxStalagmiteStalactiteHeightDiff));
+                        j = Math.max(0, l + Mth.randomBetweenInclusive(random, -config.maxStalagmiteStalactiteHeightDiff, config.maxStalagmiteStalactiteHeightDiff));
                     } else {
                         j = this.getHeight(random, localX, localZ, density, height, config);
                     }
@@ -108,7 +108,7 @@ public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFea
                     int o = optionalInt.getAsInt();
                     int p = Math.max(o - l, n + 1);
                     int q = Math.min(n + j, o - 1);
-                    int r = MathHelper.nextBetween(random, p, q + 1);
+                    int r = Mth.randomBetweenInclusive(random, p, q + 1);
                     int s = r - 1;
                     m = o - r;
                     t = s - n;
@@ -117,49 +117,52 @@ public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFea
                     t = j;
                 }
 
-                boolean bl4 = random.nextBoolean() && m > 0 && t > 0 && caveSurface.getOptionalHeight().isPresent() && m + t == caveSurface.getOptionalHeight().getAsInt();
+                m = Math.min(m, random.nextBoolean() ? 2 : 3);
+                t = Math.min(t, random.nextBoolean() ? 2 : 3);
+
+                boolean bl4 = random.nextBoolean() && m > 0 && t > 0 && caveSurface.getHeight().isPresent() && m + t == caveSurface.getHeight().getAsInt();
                 if (optionalInt.isPresent()) {
-                    DarkDripstoneHelper.generatePointedDarkDripstone(world, pos.withY(optionalInt.getAsInt() - 1), Direction.DOWN, m, bl4);
+                    DarkDripstoneHelper.generatePointedDarkDripstone(world, pos.atY(optionalInt.getAsInt() - 1), Direction.DOWN, m, bl4);
                 }
 
                 if (optionalInt3.isPresent()) {
-                    DarkDripstoneHelper.generatePointedDarkDripstone(world, pos.withY(optionalInt3.getAsInt() + 1), Direction.UP, t, bl4);
+                    DarkDripstoneHelper.generatePointedDarkDripstone(world, pos.atY(optionalInt3.getAsInt() + 1), Direction.UP, t, bl4);
                 }
 
             }
         }
     }
 
-    private boolean isLava(WorldView world, BlockPos pos) {
-        return world.getBlockState(pos).isOf(Blocks.LAVA);
+    private boolean isLava(LevelReader world, BlockPos pos) {
+        return world.getBlockState(pos).is(Blocks.LAVA);
     }
 
-    private int getHeight(Random random, int localX, int localZ, float density, int height, DarkDripstoneClusterFeatureConfig config) {
+    private int getHeight(RandomSource random, int localX, int localZ, float density, int height, DarkDripstoneClusterFeatureConfig config) {
         if (random.nextFloat() > density) {
             return 0;
         } else {
             int i = Math.abs(localX) + Math.abs(localZ);
-            float f = (float)MathHelper.clampedMap((double)i, 0.0, (double)config.maxDistanceFromCenterAffectingHeightBias, (double)height / 2.0, 0.0);
+            float f = (float)Mth.clampedMap((double)i, 0.0, (double)config.maxDistanceFromCenterAffectingHeightBias, (double)height / 2.0, 0.0);
             return (int)clampedGaussian(random, 0.0F, (float)height, f, (float)config.heightDeviation);
         }
     }
 
-    private boolean canWaterSpawn(StructureWorldAccess world, BlockPos pos) {
+    private boolean canWaterSpawn(WorldGenLevel world, BlockPos pos) {
         BlockState blockState = world.getBlockState(pos);
-        if (!blockState.isOf(Blocks.WATER) && !blockState.isOf(ModBlocks.DARK_DRIPSTONE_BLOCK) && !blockState.isOf(ModBlocks.POINTED_DARK_DRIPSTONE)) {
-            if (world.getBlockState(pos.up()).getFluidState().isIn(FluidTags.WATER)) {
+        if (!blockState.is(Blocks.WATER) && !blockState.is(ModBlocks.DARK_DRIPSTONE_BLOCK) && !blockState.is(ModBlocks.POINTED_DARK_DRIPSTONE)) {
+            if (world.getBlockState(pos.above()).getFluidState().is(FluidTags.WATER)) {
                 return false;
             } else {
-                Iterator var4 = Direction.Type.HORIZONTAL.iterator();
+                Iterator var4 = Direction.Plane.HORIZONTAL.iterator();
 
                 Direction direction;
                 do {
                     if (!var4.hasNext()) {
-                        return this.isStoneOrWater(world, pos.down());
+                        return this.isStoneOrWater(world, pos.below());
                     }
 
                     direction = (Direction)var4.next();
-                } while(this.isStoneOrWater(world, pos.offset(direction)));
+                } while(this.isStoneOrWater(world, pos.relative(direction)));
 
                 return false;
             }
@@ -168,13 +171,13 @@ public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFea
         }
     }
 
-    private boolean isStoneOrWater(WorldAccess world, BlockPos pos) {
+    private boolean isStoneOrWater(LevelAccessor world, BlockPos pos) {
         BlockState blockState = world.getBlockState(pos);
-        return blockState.isIn(BlockTags.BASE_STONE_OVERWORLD) || blockState.getFluidState().isIn(FluidTags.WATER);
+        return blockState.is(BlockTags.BASE_STONE_OVERWORLD) || blockState.getFluidState().is(FluidTags.WATER);
     }
 
-    private void placeDarkDripstoneBlocks(StructureWorldAccess world, BlockPos pos, int height, Direction direction) {
-        BlockPos.Mutable mutable = pos.mutableCopy();
+    private void placeDarkDripstoneBlocks(WorldGenLevel world, BlockPos pos, int height, Direction direction) {
+        BlockPos.MutableBlockPos mutable = pos.mutable();
 
         for(int i = 0; i < height; ++i) {
             if (!DarkDripstoneHelper.generateDarkDripstoneBlock(world, mutable)) {
@@ -190,10 +193,10 @@ public class DarkDripstoneClusterFeature extends Feature<DarkDripstoneClusterFea
         int i = radiusX - Math.abs(localX);
         int j = radiusZ - Math.abs(localZ);
         int k = Math.min(i, j);
-        return (double)MathHelper.clampedMap((float)k, 0.0F, (float)config.maxDistanceFromCenterAffectingChanceOfDripstoneColumn, config.chanceOfDripstoneColumnAtMaxDistanceFromCenter, 1.0F);
+        return (double)Mth.clampedMap((float)k, 0.0F, (float)config.maxDistanceFromCenterAffectingChanceOfDripstoneColumn, config.chanceOfDripstoneColumnAtMaxDistanceFromCenter, 1.0F);
     }
 
-    private static float clampedGaussian(Random random, float min, float max, float mean, float deviation) {
-        return ClampedNormalFloatProvider.get(random, mean, deviation, min, max);
+    private static float clampedGaussian(RandomSource random, float min, float max, float mean, float deviation) {
+        return ClampedNormalFloat.sample(random, mean, deviation, min, max);
     }
 }
