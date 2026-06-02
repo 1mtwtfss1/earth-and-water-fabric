@@ -119,11 +119,11 @@ public class EarthChargeProjectileEntity extends AbstractArrow {
                 ExplosionUtil.createSilentExplosion(
                         serverWorld,
                         pos,
-                        1.5f,
+                        2.5f,
                         this,
                         excludedEntity,
                         earthChargeDamage,
-                        26.0f,
+                        24.0f,
                         0.4f
                 );
             }
@@ -145,17 +145,6 @@ public class EarthChargeProjectileEntity extends AbstractArrow {
                             .get(ModDamageTypes.WATER_CHARGE.identifier()).get(),
                     this,
                     this.getOwner()
-            );
-
-            ExplosionUtil.createSilentExplosion(
-                    serverWorld,
-                    this.position(),
-                    3.0f,
-                    this,
-                    null,
-                    waterChargeDamage,
-                    13.0f,
-                    2.0f
             );
 
             for (int i = 0; i < 6; i++) {

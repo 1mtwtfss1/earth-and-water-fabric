@@ -30,6 +30,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 import potatowolfie.earth_and_water.damage.ModDamageTypes;
 import potatowolfie.earth_and_water.effect.ModEffects;
 import potatowolfie.earth_and_water.entity.ModEntities;
@@ -54,12 +55,12 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
 
     private static final float DIRECT_DAMAGE = 4.5F;
     private static final float INDIRECT_KNOCKBACK_RADIUS = 5.0F;
-    private static final float KNOCKBACK_STRENGTH = 0.5F;
+    private static final float KNOCKBACK_STRENGTH = 1.1F;
     private static final int BUBBLE_EFFECT_DURATION = 60;
     private static final float WATER_BREATHING_DURATION = 2.5F;
 
-    private static final float EXPLOSION_DAMAGE_FACTOR = 1.5F;
-    private static final float MAX_EXPLOSION_DAMAGE = 4.5F;
+    private static final float EXPLOSION_DAMAGE_FACTOR = 1.0F;
+    private static final float MAX_EXPLOSION_DAMAGE = 6.0F;
     private static final float EXPLOSION_KNOCKBACK_MULTIPLIER = 1.2F;
 
     private int bubbleEffectTimer = 0;
@@ -141,7 +142,6 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
         return false;
     }
 
-
     private void restoreOxygen(LivingEntity entity) {
         if (!level().isClientSide() && entity instanceof Player) {
             ServerLevel serverWorld = (ServerLevel) level();
@@ -157,7 +157,7 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
         }
     }
 
-    private void createWaterExplosionEffects() {
+    private void createWaterExplosionEffects(@Nullable Entity excludedEntity) {
         Level world = this.level();
         Vec3 pos = this.position();
 
@@ -179,10 +179,10 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
                     this.position(),
                     3.0f,
                     this,
-                    null,
+                    excludedEntity,
                     waterChargeDamage,
-                    13.0f,
-                    2.0f
+                    6.0f,
+                    3.0f
             );
 
             serverWorld.sendParticles(
@@ -255,7 +255,7 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
             );
 
             List<Entity> nearbyEntities = world.getEntitiesOfClass(Entity.class, affectBox, entity ->
-                    entity != this && entity != this.getOwner());
+                    entity != this && entity != this.getOwner() && entity != excludedEntity);
 
             for (Entity entity : nearbyEntities) {
                 double distance = entity.position().distanceTo(pos);
@@ -267,7 +267,7 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
                     Vec3 knockbackDir = entity.position().subtract(pos).normalize();
                     float knockbackStrength = KNOCKBACK_STRENGTH * explosionFactor;
 
-                    double upwardForce = 0.2 + (0.3 * explosionFactor);
+                    double upwardForce = 0.2 + (0.5 * explosionFactor);
 
                     entity.push(
                             knockbackDir.x * knockbackStrength,
@@ -299,7 +299,7 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
     }
 
     private void createWaterShockwave() {
-        createWaterExplosionEffects();
+        createWaterExplosionEffects(null);
     }
 
     private void createDirectHitEffect(Entity hitEntity) {
@@ -522,29 +522,8 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
 
         this.exactHitPosition = entityHitResult.getLocation();
 
-        if (entity instanceof LivingEntity livingEntity) {
-            if (level() instanceof ServerLevel serverWorld) {
-                DamageSource waterChargeDamage = new DamageSource(
-                        serverWorld.registryAccess()
-                                .lookupOrThrow(Registries.DAMAGE_TYPE)
-                                .get(ModDamageTypes.WATER_CHARGE.identifier()).get(),
-                        this,
-                        this.getOwner()
-                );
-                livingEntity.hurtServer(serverWorld, waterChargeDamage, DIRECT_DAMAGE);
-            }
-
-            int durationTicks = (int)(WATER_BREATHING_DURATION * 20);
-            MobEffectInstance breathEffect = new MobEffectInstance(ModEffects.BREATH_GIVING, durationTicks, 1);
-            livingEntity.addEffect(breathEffect);
-
-            restoreOxygen(livingEntity);
-        }
-
-        createWaterExplosionEffects();
-
-        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
-                SoundEvents.GILDED_BLACKSTONE_BREAK, SoundSource.BLOCKS, 1.0F, 1.2F);
+        createDirectHitEffect(entity);
+        createWaterExplosionEffects(entity);
     }
 
     @Override
@@ -604,7 +583,6 @@ public class WaterChargeProjectileEntity extends AbstractArrow {
             return AbstractArrow.Pickup.ALLOWED;
         }
     }
-
 
     @Override
     public void tick() {
