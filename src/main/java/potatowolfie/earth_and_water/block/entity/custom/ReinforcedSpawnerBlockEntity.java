@@ -16,19 +16,24 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.BaseSpawner;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.SpawnData;
+import net.minecraft.world.level.Spawner;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
+import org.jspecify.annotations.Nullable;
 
-public class ReinforcedSpawnerBlockEntity extends BlockEntity {
+public class ReinforcedSpawnerBlockEntity extends BlockEntity implements Spawner {
     private static final int DETECTION_RADIUS = 14;
     private static final int SPAWN_DELAY = 20;
     private static final int BASE_WAVE_SIZE = 3;
@@ -42,6 +47,22 @@ public class ReinforcedSpawnerBlockEntity extends BlockEntity {
 
     private static final int ACTIVATION_PARTICLE_DURATION = 5;
     private static final int WAVE_PARTICLE_DURATION = 5;
+
+    private final BaseSpawner spawner = new BaseSpawner() {
+        @Override
+        public void broadcastEvent(Level level, BlockPos pos, int id) {
+            level.blockEvent(pos, level.getBlockState(pos).getBlock(), id, 0);
+        }
+
+        @Override
+        public void setNextSpawnData(@Nullable Level level, BlockPos pos, SpawnData nextSpawnData) {
+            super.setNextSpawnData(level, pos, nextSpawnData);
+            if (level != null) {
+                BlockState state = level.getBlockState(pos);
+                level.sendBlockUpdated(pos, state, state, 260);
+            }
+        }
+    };
 
     private EntityType<?> entityType = null;
     private boolean isActive = false;
@@ -446,6 +467,10 @@ public class ReinforcedSpawnerBlockEntity extends BlockEntity {
     public void setEntityType(EntityType<?> entityType) {
         this.entityType = entityType;
         this.cachedDisplayEntity = null;
+
+        if (this.level != null) {
+            this.spawner.setEntityId(entityType, this.level, this.level.getRandom(), this.worldPosition);
+        }
         setChanged();
 
         if (level != null && !level.isClientSide()) {
@@ -487,18 +512,33 @@ public class ReinforcedSpawnerBlockEntity extends BlockEntity {
     }
 
     @Override
+    public void setEntityId(EntityType<?> type, RandomSource random) {
+        this.spawner.setEntityId(type, this.level, random, this.worldPosition);
+        this.entityType = type;
+        this.cachedDisplayEntity = null;
+        this.setChanged();
+    }
+
+    public BaseSpawner getSpawner() {
+        return this.spawner;
+    }
+
+    @Override
     public ClientboundBlockEntityDataPacket getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveCustomOnly(registries);
+        CompoundTag tag = this.saveCustomOnly(registries);
+        tag.remove("SpawnPotentials");
+        return tag;
     }
 
     @Override
     public void loadAdditional(ValueInput readView) {
         super.loadAdditional(readView);
+        this.spawner.load(this.level, this.worldPosition, readView);
 
         readView.getString("EntityType").ifPresent(entityTypeId -> {
             this.entityType = BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.parse(entityTypeId));
@@ -544,6 +584,7 @@ public class ReinforcedSpawnerBlockEntity extends BlockEntity {
     @Override
     public void saveAdditional(ValueOutput writeView) {
         super.saveAdditional(writeView);
+        this.spawner.save(writeView);
 
         if (this.entityType != null) {
             Identifier entityTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(this.entityType);

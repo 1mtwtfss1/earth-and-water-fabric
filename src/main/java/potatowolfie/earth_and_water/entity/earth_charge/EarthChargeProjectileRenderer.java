@@ -48,8 +48,6 @@ public class EarthChargeProjectileRenderer extends EntityRenderer<EarthChargePro
                     state.lightCoords,
                     OverlayTexture.NO_OVERLAY,
                     null,
-                    false,
-                    false,
                     -1,
                     null,
                     0

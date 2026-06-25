@@ -62,8 +62,6 @@ public class SpikedShieldModelRenderer implements SpecialModelRenderer<DataCompo
                 lightCoords,
                 overlayCoords,
                 this.spriteHolder.get(spriteIdentifier),
-                false,
-                false,
                 -1,
                 null,
                 outlineColor
@@ -76,8 +74,6 @@ public class SpikedShieldModelRenderer implements SpecialModelRenderer<DataCompo
                 lightCoords,
                 overlayCoords,
                 this.spriteHolder.get(EarthWaterClient.SPIKED_SHIELD_BASE_NO_PATTERN),
-                false,
-                hasFoil,
                 -1,
                 null,
                 outlineColor
@@ -94,8 +90,6 @@ public class SpikedShieldModelRenderer implements SpecialModelRenderer<DataCompo
                     lightCoords,
                     overlayCoords,
                     this.spriteHolder.get(baseLayerSprite),
-                    false,
-                    false,
                     baseColor.getTextureDiffuseColor(),
                     null,
                     0
@@ -112,8 +106,6 @@ public class SpikedShieldModelRenderer implements SpecialModelRenderer<DataCompo
                         lightCoords,
                         overlayCoords,
                         this.spriteHolder.get(patternSprite),
-                        false,
-                        false,
                         layer.color().getTextureDiffuseColor(),
                         null,
                         0
@@ -128,8 +120,6 @@ public class SpikedShieldModelRenderer implements SpecialModelRenderer<DataCompo
                         lightCoords,
                         overlayCoords,
                         this.spriteHolder.get(spriteIdentifier),
-                        false,
-                        false,
                         -1,
                         null,
                         0
@@ -144,8 +134,6 @@ public class SpikedShieldModelRenderer implements SpecialModelRenderer<DataCompo
                 lightCoords,
                 overlayCoords,
                 this.spriteHolder.get(spriteIdentifier),
-                false,
-                false,
                 -1,
                 null,
                 outlineColor

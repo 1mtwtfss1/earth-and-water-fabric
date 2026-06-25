@@ -7,13 +7,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.*;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RotatedPillarBlock;
-import net.minecraft.world.level.block.SlabBlock;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.material.MapColor;
@@ -150,21 +144,13 @@ public class ModBlocks {
             new WallBlock(BlockBehaviour.Properties.ofFullCopy(DRIPSTONE_BRICKS)
                     .setId(createBlockRegistryKey("dark_dripstone_brick_wall"))));
 
-    public static final Block POINTED_DARK_DRIPSTONE = registerBlock("pointed_dark_dripstone",
-            new PointedDarkDripstoneBlock(BlockBehaviour.Properties.of()
-                    .mapColor(MapColor.TERRACOTTA_BROWN)
-                    .forceSolidOn()
-                    .requiresCorrectToolForDrops()
-                    .instrument(NoteBlockInstrument.BASEDRUM)
-                    .noOcclusion()
-                    .sound(SoundType.POINTED_DRIPSTONE)
-                    .randomTicks()
-                    .strength(1.5F, 3.0F)
-                    .dynamicShape()
-                    .offsetType(BlockBehaviour.OffsetType.XZ)
-                    .pushReaction(PushReaction.DESTROY)
-                    .isRedstoneConductor(Blocks::never)
-                    .setId(createBlockRegistryKey("pointed_dark_dripstone"))));
+    public static final Block POINTED_DARK_DRIPSTONE = registerBlock(
+            "pointed_dark_dripstone",
+            new PointedDarkDripstoneBlock(DRIPSTONE_BRICKS.defaultBlockState(),
+                    BlockBehaviour.Properties.ofFullCopy(POINTED_DRIPSTONE)
+                            .setId(createBlockRegistryKey("pointed_dark_dripstone"))
+            )
+    );
 
     public static final Block CHISELED_PRISMARINE_BRICKS = registerBlock("chiseled_prismarine_bricks",
             new ChiseledPrismarineBricksBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN)
@@ -253,7 +239,7 @@ public class ModBlocks {
                     .lightLevel(state -> 3)
                     .strength(0.5F)
                     .isValidSpawn((state, world, pos, entityType) -> entityType.fireImmune())
-                    .emissiveRendering(Blocks::always)
+                    .emissiveRendering(state -> true)
                     .setId(createBlockRegistryKey("oxygen_block"))));
 
     public static final Block OXYGEN_BUBBLE = registerBlock("oxygen_bubble",

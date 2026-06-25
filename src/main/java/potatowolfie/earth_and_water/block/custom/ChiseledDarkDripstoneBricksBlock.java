@@ -54,8 +54,7 @@ public class ChiseledDarkDripstoneBricksBlock extends Block {
             double y = pos.getY();
             double z = pos.getZ();
             AABB box = new AABB(x - 5, y - 5, z - 5, x + 5, y + 5, z + 5);
-            List<Player> players = world.getEntities(EntityType.PLAYER, box,
-                    player -> !player.isSpectator() && !player.isInvisible());
+            List<Player> players = world.getEntitiesOfClass(Player.class, box, player -> !player.isSpectator() && !player.isInvisible());
             boolean playerNearby = !players.isEmpty();
             boolean wasPowered = state.getValue(POWERED);
 

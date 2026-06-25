@@ -12,7 +12,6 @@ import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.client.model.object.equipment.ShieldModel;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.client.resources.model.sprite.SpriteId;
@@ -67,6 +66,7 @@ public class SpikedShieldEntityModel extends ShieldModel {
 		return LayerDefinition.create(modelData, 64, 64);
 	}
 
+	/*
 	public void render(ItemStack stack, PoseStack matrices, MultiBufferSource vertexConsumers,
 					   int light, int overlay, SpriteId baseSprite, SpriteId noPatternSprite,
 					   SpriteGetter spriteHolder) {
@@ -80,6 +80,8 @@ public class SpikedShieldEntityModel extends ShieldModel {
 		this.handle.render(matrices, vertexConsumer, light, overlay);
 		this.spikes.render(matrices, vertexConsumer, light, overlay);
 	}
+
+	 */
 
 	@Override
 	public ModelPart plate() {

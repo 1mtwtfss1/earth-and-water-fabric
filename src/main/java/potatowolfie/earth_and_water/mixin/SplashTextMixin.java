@@ -1,5 +1,6 @@
 package potatowolfie.earth_and_water.mixin;
 
+import net.minecraft.network.chat.Style;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,25 +16,25 @@ import net.minecraft.network.chat.Component;
 public class SplashTextMixin {
 
     @Shadow
-    private List<String> splashes;
+    private List<Component> splashes;
 
-    @Inject(method = "apply*",
-            at = @At("TAIL"))
+    @Inject(method = "apply*", at = @At("TAIL"))
     private void addEANDWSplashes(CallbackInfo ci) {
         splashes = new ArrayList<>(splashes);
 
-        splashes.add(Component.translatable("splash.earth-and-water.sticks_stone").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.herobrine").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.september").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.w_e_f_a").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.w_e_f_a").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.drowning").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.splash").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.hardlyknower").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.removed_the_brine").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.bore_you").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.sweet_carobrine").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.sun_tzu").getString());
-        splashes.add(Component.translatable("splash.earth-and-water.bore_d").getString());
+        Style yellowStyle = Style.EMPTY.withColor(0xFFFF00);
+
+        splashes.add(Component.translatable("splash.earth-and-water.sticks_stone").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.herobrine").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.september").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.w_e_f_a").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.drowning").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.splash").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.hardlyknower").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.removed_the_brine").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.bore_you").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.sweet_carobrine").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.sun_tzu").setStyle(yellowStyle));
+        splashes.add(Component.translatable("splash.earth-and-water.bore_d").setStyle(yellowStyle));
     }
 }

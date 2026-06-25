@@ -1,7 +1,9 @@
 package potatowolfie.earth_and_water.mixin;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -27,16 +29,20 @@ public class ShieldBlockingMixin {
                     }
                 }
 
+                if (source.is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE)) {
+                    return;
+                }
+
                 if (source.getEntity() instanceof LivingEntity attacker) {
                     attacker.hurtServer(world, entity.damageSources().thorns(entity), 3.5F);
 
                     activeItem.hurtAndBreak(Math.max((int)amount, 1), entity, entity.getUsedItemHand() == null ?
                             (entity.getMainHandItem() == activeItem ?
-                                    net.minecraft.world.entity.EquipmentSlot.MAINHAND :
-                                    net.minecraft.world.entity.EquipmentSlot.OFFHAND) :
-                            (entity.getUsedItemHand() == net.minecraft.world.InteractionHand.MAIN_HAND ?
-                                    net.minecraft.world.entity.EquipmentSlot.MAINHAND :
-                                    net.minecraft.world.entity.EquipmentSlot.OFFHAND));
+                                    EquipmentSlot.MAINHAND :
+                                    EquipmentSlot.OFFHAND) :
+                            (entity.getUsedItemHand() == InteractionHand.MAIN_HAND ?
+                                    EquipmentSlot.MAINHAND :
+                                    EquipmentSlot.OFFHAND));
                 }
             }
         }

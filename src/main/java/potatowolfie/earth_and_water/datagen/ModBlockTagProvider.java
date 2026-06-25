@@ -3,7 +3,10 @@ package potatowolfie.earth_and_water.datagen;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricTagsProvider;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.Block;
 import potatowolfie.earth_and_water.block.ModBlocks;
 
 import java.util.concurrent.CompletableFuture;
@@ -15,104 +18,113 @@ public class ModBlockTagProvider extends FabricTagsProvider.BlockTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider wrapperLookup) {
-        valueLookupBuilder(BlockTags.MINEABLE_WITH_PICKAXE)
+
+        builder(BlockTags.MINEABLE_WITH_PICKAXE)
                 .add(
-                        ModBlocks.DRIPSTONE_STAIRS,
-                        ModBlocks.DRIPSTONE_SLAB,
-                        ModBlocks.DRIPSTONE_WALL,
-                        ModBlocks.DRIPSTONE_BRICKS,
-                        ModBlocks.DRIPSTONE_BRICK_STAIRS,
-                        ModBlocks.DRIPSTONE_BRICK_SLAB,
-                        ModBlocks.DRIPSTONE_BRICK_WALL,
-                        ModBlocks.POLISHED_DRIPSTONE,
-                        ModBlocks.POLISHED_DRIPSTONE_STAIRS,
-                        ModBlocks.POLISHED_DRIPSTONE_SLAB,
-                        ModBlocks.POLISHED_DRIPSTONE_WALL,
-                        ModBlocks.POLISHED_DRIPSTONE_TILES,
-                        ModBlocks.DRIPSTONE_PILLAR,
-                        ModBlocks.CHISELED_DRIPSTONE_BRICKS,
-                        ModBlocks.DARK_DRIPSTONE_BLOCK,
-                        ModBlocks.DARK_DRIPSTONE_STAIRS,
-                        ModBlocks.DARK_DRIPSTONE_SLAB,
-                        ModBlocks.DARK_DRIPSTONE_WALL,
-                        ModBlocks.DARK_DRIPSTONE_BRICKS,
-                        ModBlocks.DARK_DRIPSTONE_BRICK_STAIRS,
-                        ModBlocks.DARK_DRIPSTONE_BRICK_SLAB,
-                        ModBlocks.DARK_DRIPSTONE_BRICK_WALL,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE_STAIRS,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE_SLAB,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE_WALL,
-                        ModBlocks.DARK_DRIPSTONE_PILLAR,
-                        ModBlocks.POINTED_DARK_DRIPSTONE,
-                        ModBlocks.DARK_PRISMARINE_PILLAR,
-                        ModBlocks.CHISELED_PRISMARINE_BRICKS,
-                        ModBlocks.PRISMARINE_PILLAR,
-                        ModBlocks.PRISMARINE_TILES,
-                        ModBlocks.PRISMARINE_TILE_STAIRS,
-                        ModBlocks.PRISMARINE_TILE_SLAB,
-                        ModBlocks.PRISMARINE_TILE_WALL,
-                        ModBlocks.MIXED_PRISMARINE_TILES,
-                        ModBlocks.CHISELED_DARK_PRISMARINE,
-                        ModBlocks.DARK_PRISMARINE_WALL,
-                        ModBlocks.OXYGEN_BLOCK,
-                        ModBlocks.LIMESTONE,
-                        ModBlocks.LIMESTONE_STAIRS,
-                        ModBlocks.LIMESTONE_SLAB,
-                        ModBlocks.LIMESTONE_WALL,
-                        ModBlocks.POLISHED_LIMESTONE,
-                        ModBlocks.POLISHED_LIMESTONE_STAIRS,
-                        ModBlocks.POLISHED_LIMESTONE_SLAB,
-                        ModBlocks.POLISHED_LIMESTONE_WALL,
-                        ModBlocks.LIMESTONE_BRICKS,
-                        ModBlocks.LIMESTONE_BRICK_STAIRS,
-                        ModBlocks.LIMESTONE_BRICK_SLAB,
-                        ModBlocks.LIMESTONE_BRICK_WALL,
-                        ModBlocks.LIMESTONE_PILLAR,
-                        ModBlocks.CHISELED_LIMESTONE_BRICKS
+                        key(ModBlocks.DRIPSTONE_STAIRS),
+                        key(ModBlocks.DRIPSTONE_SLAB),
+                        key(ModBlocks.DRIPSTONE_WALL),
+                        key(ModBlocks.DRIPSTONE_BRICKS),
+                        key(ModBlocks.DRIPSTONE_BRICK_STAIRS),
+                        key(ModBlocks.DRIPSTONE_BRICK_SLAB),
+                        key(ModBlocks.DRIPSTONE_BRICK_WALL),
+                        key(ModBlocks.POLISHED_DRIPSTONE),
+                        key(ModBlocks.POLISHED_DRIPSTONE_STAIRS),
+                        key(ModBlocks.POLISHED_DRIPSTONE_SLAB),
+                        key(ModBlocks.POLISHED_DRIPSTONE_WALL),
+                        key(ModBlocks.POLISHED_DRIPSTONE_TILES),
+                        key(ModBlocks.DRIPSTONE_PILLAR),
+                        key(ModBlocks.CHISELED_DRIPSTONE_BRICKS),
+                        key(ModBlocks.DARK_DRIPSTONE_BLOCK),
+                        key(ModBlocks.DARK_DRIPSTONE_STAIRS),
+                        key(ModBlocks.DARK_DRIPSTONE_SLAB),
+                        key(ModBlocks.DARK_DRIPSTONE_WALL),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICKS),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICK_STAIRS),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICK_SLAB),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICK_WALL),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE_STAIRS),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE_SLAB),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE_WALL),
+                        key(ModBlocks.DARK_DRIPSTONE_PILLAR),
+                        key(ModBlocks.POINTED_DARK_DRIPSTONE),
+                        key(ModBlocks.DARK_PRISMARINE_PILLAR),
+                        key(ModBlocks.CHISELED_PRISMARINE_BRICKS),
+                        key(ModBlocks.PRISMARINE_PILLAR),
+                        key(ModBlocks.PRISMARINE_TILES),
+                        key(ModBlocks.PRISMARINE_TILE_STAIRS),
+                        key(ModBlocks.PRISMARINE_TILE_SLAB),
+                        key(ModBlocks.PRISMARINE_TILE_WALL),
+                        key(ModBlocks.MIXED_PRISMARINE_TILES),
+                        key(ModBlocks.CHISELED_DARK_PRISMARINE),
+                        key(ModBlocks.DARK_PRISMARINE_WALL),
+                        key(ModBlocks.OXYGEN_BLOCK),
+                        key(ModBlocks.LIMESTONE),
+                        key(ModBlocks.LIMESTONE_STAIRS),
+                        key(ModBlocks.LIMESTONE_SLAB),
+                        key(ModBlocks.LIMESTONE_WALL),
+                        key(ModBlocks.POLISHED_LIMESTONE),
+                        key(ModBlocks.POLISHED_LIMESTONE_STAIRS),
+                        key(ModBlocks.POLISHED_LIMESTONE_SLAB),
+                        key(ModBlocks.POLISHED_LIMESTONE_WALL),
+                        key(ModBlocks.LIMESTONE_BRICKS),
+                        key(ModBlocks.LIMESTONE_BRICK_STAIRS),
+                        key(ModBlocks.LIMESTONE_BRICK_SLAB),
+                        key(ModBlocks.LIMESTONE_BRICK_WALL),
+                        key(ModBlocks.LIMESTONE_PILLAR),
+                        key(ModBlocks.CHISELED_LIMESTONE_BRICKS)
                 );
 
-        valueLookupBuilder(BlockTags.WALLS)
-                .add(ModBlocks.POLISHED_DRIPSTONE_WALL,
-                        ModBlocks.DRIPSTONE_WALL,
-                        ModBlocks.PRISMARINE_TILE_WALL,
-                        ModBlocks.DARK_DRIPSTONE_WALL,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE_WALL,
-                        ModBlocks.DARK_DRIPSTONE_BRICK_WALL,
-                        ModBlocks.DARK_PRISMARINE_WALL,
-                        ModBlocks.LIMESTONE_WALL,
-                        ModBlocks.POLISHED_LIMESTONE_WALL,
-                        ModBlocks.LIMESTONE_BRICK_WALL
+        builder(BlockTags.WALLS)
+                .add(
+                        key(ModBlocks.POLISHED_DRIPSTONE_WALL),
+                        key(ModBlocks.DRIPSTONE_WALL),
+                        key(ModBlocks.PRISMARINE_TILE_WALL),
+                        key(ModBlocks.DARK_DRIPSTONE_WALL),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE_WALL),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICK_WALL),
+                        key(ModBlocks.DARK_PRISMARINE_WALL),
+                        key(ModBlocks.LIMESTONE_WALL),
+                        key(ModBlocks.POLISHED_LIMESTONE_WALL),
+                        key(ModBlocks.LIMESTONE_BRICK_WALL)
                 );
 
-        valueLookupBuilder(BlockTags.SLABS)
-                .add(ModBlocks.DRIPSTONE_SLAB,
-                        ModBlocks.DRIPSTONE_BRICK_SLAB,
-                        ModBlocks.POLISHED_DRIPSTONE_SLAB,
-                        ModBlocks.DARK_DRIPSTONE_SLAB,
-                        ModBlocks.DARK_DRIPSTONE_BRICK_SLAB,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE_SLAB,
-                        ModBlocks.PRISMARINE_TILE_SLAB,
-                        ModBlocks.LIMESTONE_SLAB,
-                        ModBlocks.POLISHED_LIMESTONE_SLAB,
-                        ModBlocks.LIMESTONE_BRICK_SLAB
+        builder(BlockTags.SLABS)
+                .add(
+                        key(ModBlocks.DRIPSTONE_SLAB),
+                        key(ModBlocks.DRIPSTONE_BRICK_SLAB),
+                        key(ModBlocks.POLISHED_DRIPSTONE_SLAB),
+                        key(ModBlocks.DARK_DRIPSTONE_SLAB),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICK_SLAB),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE_SLAB),
+                        key(ModBlocks.PRISMARINE_TILE_SLAB),
+                        key(ModBlocks.LIMESTONE_SLAB),
+                        key(ModBlocks.POLISHED_LIMESTONE_SLAB),
+                        key(ModBlocks.LIMESTONE_BRICK_SLAB)
                 );
 
-        valueLookupBuilder(BlockTags.STAIRS)
-                .add(ModBlocks.DRIPSTONE_STAIRS,
-                        ModBlocks.DRIPSTONE_BRICK_STAIRS,
-                        ModBlocks.POLISHED_DRIPSTONE_STAIRS,
-                        ModBlocks.DARK_DRIPSTONE_STAIRS,
-                        ModBlocks.DARK_DRIPSTONE_BRICK_STAIRS,
-                        ModBlocks.POLISHED_DARK_DRIPSTONE_STAIRS,
-                        ModBlocks.PRISMARINE_TILE_STAIRS,
-                        ModBlocks.LIMESTONE_STAIRS,
-                        ModBlocks.POLISHED_LIMESTONE_STAIRS,
-                        ModBlocks.LIMESTONE_BRICK_STAIRS
+        builder(BlockTags.STAIRS)
+                .add(
+                        key(ModBlocks.DRIPSTONE_STAIRS),
+                        key(ModBlocks.DRIPSTONE_BRICK_STAIRS),
+                        key(ModBlocks.POLISHED_DRIPSTONE_STAIRS),
+                        key(ModBlocks.DARK_DRIPSTONE_STAIRS),
+                        key(ModBlocks.DARK_DRIPSTONE_BRICK_STAIRS),
+                        key(ModBlocks.POLISHED_DARK_DRIPSTONE_STAIRS),
+                        key(ModBlocks.PRISMARINE_TILE_STAIRS),
+                        key(ModBlocks.LIMESTONE_STAIRS),
+                        key(ModBlocks.POLISHED_LIMESTONE_STAIRS),
+                        key(ModBlocks.LIMESTONE_BRICK_STAIRS)
                 );
 
-        valueLookupBuilder(BlockTags.REPLACEABLE)
-                .add(ModBlocks.OXYGEN_BUBBLE
+        builder(BlockTags.REPLACEABLE)
+                .add(
+                        key(ModBlocks.OXYGEN_BUBBLE)
                 );
+    }
+
+    private static ResourceKey<Block> key(Block block) {
+        return BuiltInRegistries.BLOCK.wrapAsHolder(block).unwrapKey().orElseThrow();
     }
 }

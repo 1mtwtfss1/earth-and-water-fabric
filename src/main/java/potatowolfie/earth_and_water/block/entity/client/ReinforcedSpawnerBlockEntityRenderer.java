@@ -9,9 +9,12 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.blockentity.SpawnerRenderer;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.BaseSpawner;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -32,47 +35,63 @@ public class ReinforcedSpawnerBlockEntityRenderer implements BlockEntityRenderer
 
     @Override
     public void submit(SpawnerRenderState state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState camera) {
-        if (state.mobSpawnerRenderState.displayEntity != null) {
+        if (state.displayEntity != null) {
             SpawnerRenderer.submitEntityInSpawner(
                     poseStack,
                     submitNodeCollector,
-                    state.mobSpawnerRenderState.displayEntity,
+                    state.displayEntity,
                     this.entityRenderDispatcher,
-                    state.mobSpawnerRenderState.spin,
-                    state.mobSpawnerRenderState.scale,
+                    state.spin,
+                    state.scale,
                     camera
             );
         }
     }
 
     @Override
-    public void extractRenderState(ReinforcedSpawnerBlockEntity blockEntity, SpawnerRenderState state, float tickProgress, Vec3 cameraPos, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
-        BlockEntityRenderState.extractBase(blockEntity, state, crumblingOverlay);
+    public void extractRenderState(ReinforcedSpawnerBlockEntity blockEntity,
+                                   SpawnerRenderState state,
+                                   float partialTicks,
+                                   Vec3 cameraPos,
+                                   @Nullable ModelFeatureRenderer.CrumblingOverlay overlay) {
 
-        Level world = blockEntity.getLevel();
-        if (world != null) {
-            Entity entity = blockEntity.getDisplayEntity(world);
+        BlockEntityRenderState.extractBase(blockEntity, state, overlay);
 
-            if (entity != null) {
-                state.mobSpawnerRenderState.displayEntity = entityRenderDispatcher.extractEntity(entity, tickProgress);
-                state.mobSpawnerRenderState.displayEntity.lightCoords = state.lightCoords;
-
-                double lastRotation = blockEntity.getLastRotation();
-                double rotation = blockEntity.getRotation();
-                state.mobSpawnerRenderState.spin = (float)net.minecraft.util.Mth.lerp(tickProgress, lastRotation, rotation) * 10.0F;
-
-                state.mobSpawnerRenderState.scale = 0.53125F;
-                float maxDimension = Math.max(entity.getBbWidth(), entity.getBbHeight());
-                if (maxDimension > 1.0) {
-                    state.mobSpawnerRenderState.scale /= maxDimension;
-                }
-            } else {
-                state.mobSpawnerRenderState.displayEntity = null;
-            }
+        Level level = blockEntity.getLevel();
+        if (level == null) {
+            state.displayEntity = null;
+            return;
         }
+
+        BaseSpawner spawner = blockEntity.getSpawner();
+        Entity displayEntity = spawner.getOrCreateDisplayEntity(level, blockEntity.getBlockPos());
+
+        extractSpawnerData(
+                state,
+                partialTicks,
+                displayEntity,
+                this.entityRenderDispatcher,
+                blockEntity.getLastRotation(),
+                blockEntity.getRotation()
+        );
     }
 
     public static class SpawnerRenderState extends BlockEntityRenderState {
-        public final net.minecraft.client.renderer.blockentity.state.SpawnerRenderState mobSpawnerRenderState = new net.minecraft.client.renderer.blockentity.state.SpawnerRenderState();
+        public @org.jspecify.annotations.Nullable EntityRenderState displayEntity;
+        public float spin;
+        public float scale;
+    }
+
+    public static void extractSpawnerData(final SpawnerRenderState state, final float partialTicks, final @org.jspecify.annotations.Nullable Entity displayEntity, final EntityRenderDispatcher entityRenderer, final double oSpin, final double spin) {
+        if (displayEntity != null) {
+            state.displayEntity = entityRenderer.extractEntity(displayEntity, partialTicks);
+            state.displayEntity.lightCoords = state.lightCoords;
+            state.spin = (float) Mth.lerp((double)partialTicks, oSpin, spin) * 10.0F;
+            state.scale = 0.53125F;
+            float maxLength = Math.max(displayEntity.getBbWidth(), displayEntity.getBbHeight());
+            if ((double)maxLength > 1.0) {
+                state.scale /= maxLength;
+            }
+        }
     }
 }

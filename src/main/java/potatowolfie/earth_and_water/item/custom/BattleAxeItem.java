@@ -155,8 +155,10 @@ public class BattleAxeItem extends AxeItem {
                                 .get(ModDamageTypes.BATTLE_AXE.identifier()).get(),
                         player
                 );
+
                 entity.hurtServer(serverWorld, battleAxeDamage, DASH_DAMAGE);
-                entity.knockback(0.5, -lookVec.x, -lookVec.z);
+                entity.knockback(0.5, -lookVec.x, -lookVec.z, battleAxeDamage, DASH_DAMAGE);
+
                 hitAnyMob = true;
             }
 

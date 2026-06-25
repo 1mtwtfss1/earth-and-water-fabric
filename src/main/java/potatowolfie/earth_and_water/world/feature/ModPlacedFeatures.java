@@ -12,8 +12,6 @@ import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
-import net.minecraft.world.level.levelgen.feature.Feature;
-import net.minecraft.world.level.levelgen.feature.configurations.FeatureConfiguration;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.CountPlacement;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
@@ -36,61 +34,48 @@ public class ModPlacedFeatures {
     public static final ResourceKey<PlacedFeature> LIMESTONE_ROCK_PLACED = registerKey("limestone_rock");
 
     public static void bootstrap(BootstrapContext<PlacedFeature> context) {
-        HolderGetter<ConfiguredFeature<?, ?>> configuredFeatureRegistryEntryLookup =
-                context.lookup(Registries.CONFIGURED_FEATURE);
+        HolderGetter<ConfiguredFeature<?, ?>> configuredFeatures = context.lookup(Registries.CONFIGURED_FEATURE);
 
         register(context, DARK_DRIPSTONE_CLUSTER_PLACED,
-                configuredFeatureRegistryEntryLookup.getOrThrow(ModConfiguredFeatures.DARK_DRIPSTONE_CLUSTER),
-                List.of(
-                        CountPlacement.of(net.minecraft.util.valueproviders.UniformInt.of(14, 29)),
-                        InSquarePlacement.spread(),
-                        HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(0), VerticalAnchor.absolute(256)),
-                        BiomeFilter.biome()
-                ));
+                configuredFeatures.getOrThrow(ModConfiguredFeatures.DARK_DRIPSTONE_CLUSTER),
+                CountPlacement.of(UniformInt.of(14, 29)),
+                InSquarePlacement.spread(),
+                HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(0), VerticalAnchor.absolute(256)),
+                BiomeFilter.biome());
 
         register(context, LARGE_DARK_DRIPSTONE_PLACED,
-                configuredFeatureRegistryEntryLookup.getOrThrow(ModConfiguredFeatures.LARGE_DARK_DRIPSTONE),
-                List.of(
-                        CountPlacement.of(net.minecraft.util.valueproviders.UniformInt.of(3, 14)),
-                        InSquarePlacement.spread(),
-                        HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(0), VerticalAnchor.absolute(256)),
-                        BiomeFilter.biome()
-                ));
+                configuredFeatures.getOrThrow(ModConfiguredFeatures.LARGE_DARK_DRIPSTONE),
+                CountPlacement.of(UniformInt.of(3, 14)),
+                InSquarePlacement.spread(),
+                HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(0), VerticalAnchor.absolute(256)),
+                BiomeFilter.biome());
 
         register(context, POINTED_DARK_DRIPSTONE_PLACED,
-                configuredFeatureRegistryEntryLookup.getOrThrow(ModConfiguredFeatures.POINTED_DARK_DRIPSTONE),
-                List.of(
-                        new PlacementModifier[]{
-                                CountPlacement.of(UniformInt.of(192, 256)),
-                                InSquarePlacement.spread(),
-                                PlacementUtils.RANGE_BOTTOM_TO_MAX_TERRAIN_HEIGHT,
-                                CountPlacement.of(UniformInt.of(1, 5)),
-                                RandomOffsetPlacement.of
-                                        (ClampedNormalInt.of(0.0F, 3.0F, -10, 10),
-                                                ClampedNormalInt.of(0.0F, 0.6F, -2, 2)),
-                                BiomeFilter.biome()}));
+                configuredFeatures.getOrThrow(ModConfiguredFeatures.POINTED_DARK_DRIPSTONE),
+                CountPlacement.of(UniformInt.of(192, 256)),
+                InSquarePlacement.spread(),
+                PlacementUtils.RANGE_BOTTOM_TO_MAX_TERRAIN_HEIGHT,
+                CountPlacement.of(UniformInt.of(1, 5)),
+                RandomOffsetPlacement.of(
+                        ClampedNormalInt.of(0.0F, 3.0F, -10, 10),
+                        ClampedNormalInt.of(0.0F, 0.6F, -2, 2)),
+                BiomeFilter.biome());
 
         register(context, OXYGEN_CROSS_PLACED,
-                configuredFeatureRegistryEntryLookup.getOrThrow(ModConfiguredFeatures.OXYGEN_CROSS),
-                List.of(
-                        CountPlacement.of(1),
-                        InSquarePlacement.spread(),
-                        RarityFilter.onAverageOnceEvery(80),
-                        HeightmapPlacement.onHeightmap(Heightmap.Types.OCEAN_FLOOR_WG),
-                        BiomeFilter.biome()
-                )
-        );
+                configuredFeatures.getOrThrow(ModConfiguredFeatures.OXYGEN_CROSS),
+                CountPlacement.of(1),
+                InSquarePlacement.spread(),
+                RarityFilter.onAverageOnceEvery(80),
+                HeightmapPlacement.onHeightmap(Heightmap.Types.OCEAN_FLOOR_WG),
+                BiomeFilter.biome());
 
         register(context, LIMESTONE_ROCK_PLACED,
-                configuredFeatureRegistryEntryLookup.getOrThrow(ModConfiguredFeatures.LIMESTONE_ROCK),
-                List.of(
-                        CountPlacement.of(1),
-                        InSquarePlacement.spread(),
-                        RarityFilter.onAverageOnceEvery(30),
-                        HeightmapPlacement.onHeightmap(Heightmap.Types.OCEAN_FLOOR_WG),
-                        BiomeFilter.biome()
-                )
-        );
+                configuredFeatures.getOrThrow(ModConfiguredFeatures.LIMESTONE_ROCK),
+                CountPlacement.of(1),
+                InSquarePlacement.spread(),
+                RarityFilter.onAverageOnceEvery(30),
+                HeightmapPlacement.onHeightmap(Heightmap.Types.OCEAN_FLOOR_WG),
+                BiomeFilter.biome());
     }
 
     public static ResourceKey<PlacedFeature> registerKey(String name) {
@@ -99,13 +84,7 @@ public class ModPlacedFeatures {
 
     private static void register(BootstrapContext<PlacedFeature> context, ResourceKey<PlacedFeature> key,
                                  Holder<ConfiguredFeature<?, ?>> configuration,
-                                 List<PlacementModifier> modifiers) {
-        context.register(key, new PlacedFeature(configuration, List.copyOf(modifiers)));
-    }
-
-    private static <FC extends FeatureConfiguration, F extends Feature<FC>> void register(BootstrapContext<PlacedFeature> context, ResourceKey<PlacedFeature> key,
-                                                                                   Holder<ConfiguredFeature<?, ?>> configuration,
-                                                                                   PlacementModifier... modifiers) {
-        register(context, key, configuration, List.of(modifiers));
+                                 PlacementModifier... modifiers) {
+        context.register(key, new PlacedFeature(configuration, List.of(modifiers)));
     }
 }

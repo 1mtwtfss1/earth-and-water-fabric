@@ -3,6 +3,8 @@ package potatowolfie.earth_and_water.datagen;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricTagsProvider;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
 import potatowolfie.earth_and_water.item.ModItems;
 
@@ -15,23 +17,23 @@ public class ModItemTagProvider extends FabricTagsProvider.ItemTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider wrapperLookup) {
-        valueLookupBuilder(ItemTags.TRIM_MATERIALS)
-                .add(ModItems.STEEL_INGOT);
+        builder(ItemTags.TRIM_MATERIALS)
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.STEEL_INGOT).unwrapKey().orElseThrow());
 
-        valueLookupBuilder(ItemTags.SHARP_WEAPON_ENCHANTABLE)
-                .add(ModItems.BATTLE_AXE)
-                .add(ModItems.WHIP);
+        builder(ItemTags.SHARP_WEAPON_ENCHANTABLE)
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.BATTLE_AXE).unwrapKey().orElseThrow())
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.WHIP).unwrapKey().orElseThrow());
 
-        valueLookupBuilder(ItemTags.DURABILITY_ENCHANTABLE)
-                .add(ModItems.BATTLE_AXE)
-                .add(ModItems.WHIP)
-                .add(ModItems.SPIKED_SHIELD);
+        builder(ItemTags.DURABILITY_ENCHANTABLE)
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.BATTLE_AXE).unwrapKey().orElseThrow())
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.WHIP).unwrapKey().orElseThrow())
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.SPIKED_SHIELD).unwrapKey().orElseThrow());
 
-        valueLookupBuilder(ItemTags.MINING_ENCHANTABLE)
-                .add(ModItems.BATTLE_AXE);
+        builder(ItemTags.MINING_ENCHANTABLE)
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.BATTLE_AXE).unwrapKey().orElseThrow());
 
-        valueLookupBuilder(ItemTags.WEAPON_ENCHANTABLE)
-                .add(ModItems.BATTLE_AXE)
-                .add(ModItems.WHIP);
+        builder(ItemTags.WEAPON_ENCHANTABLE)
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.BATTLE_AXE).unwrapKey().orElseThrow())
+                .add(BuiltInRegistries.ITEM.wrapAsHolder(ModItems.WHIP).unwrapKey().orElseThrow());
     }
 }

@@ -66,8 +66,6 @@ public class WaterChargeProjectileRenderer extends EntityRenderer<WaterChargePro
                     state.lightCoords,
                     OverlayTexture.NO_OVERLAY,
                     null,
-                    false,
-                    false,
                     -1,
                     null,
                     0
